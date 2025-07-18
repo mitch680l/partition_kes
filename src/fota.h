@@ -1,0 +1,1 @@
+int fota_init_and_start(void);

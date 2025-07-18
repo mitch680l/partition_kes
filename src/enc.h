@@ -1,0 +1,1 @@
+int provision_config_data(void);

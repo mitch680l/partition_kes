@@ -1,0 +1,12 @@
+{
+    "files.associations": {
+        "crypto.h": "c",
+        "string": "c",
+        "vector": "c",
+        "memory": "c",
+        "string_view": "c",
+        "system_error": "c",
+        "shell.h": "c",
+        "protected_storage.h": "c"
+    }
+}
