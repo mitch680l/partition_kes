@@ -493,13 +493,7 @@ const char private_key[] = { 0x2d, 0x2d, 0x2d, 0x2d, 0x2d, 0x42, 0x45, 0x47, 0x4
 	})
 
 LOG_MODULE_REGISTER(hmac, LOG_LEVEL_DBG);
-static uint8_t m_plain_text[NRF_CRYPTO_EXAMPLE_HMAC_TEXT_SIZE] = {
-	"Example string to demonstrate basic usage of HMAC signing/verification."
-};
 
-static uint8_t hmac[NRF_CRYPTO_EXAMPLE_HMAC_KEY_SIZE];
-
-static psa_key_id_t key_id;
 
 static int provision_cert(enum modem_key_mgmt_cred_type type, const char *data)
 {
