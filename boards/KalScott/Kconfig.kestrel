@@ -1,0 +1,6 @@
+# Copyright (c) 2024 Nordic Semiconductor
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+
+config BOARD_KESTREL
+	select SOC_NRF9151_LACA if BOARD_KESTREL || BOARD_KESTREL_NS
+	

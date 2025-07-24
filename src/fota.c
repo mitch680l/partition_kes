@@ -197,7 +197,6 @@ static int update_download(void)
 int fota_init_and_start(void)
 {
 	int err;
-
 	printk("HTTP application update sample started\n");
 
 	/* This is needed so that MCUBoot won't revert the update. */
