@@ -10,7 +10,7 @@
 #include <psa/crypto.h>
 #include <string.h>
 #include <tfm_ns_interface.h>
-
+#include "certs.h"
 #define NRF_CRYPTO_EXAMPLE_AES_MAX_TEXT_SIZE (100)
 #define NRF_CRYPTO_EXAMPLE_AES_BLOCK_SIZE (16)
 #define NRF_CRYPTO_EXAMPLE_AES_IV_SIZE (12)
@@ -31,10 +31,12 @@
 #define PROVISIONING_ERROR_BUFFER_SIZE  (-108)
 
 /* AES Key - Replace with your actual key */
+/*
+
 static uint8_t m_aes_key[AES_KEY_SIZE] = {
     0xb4, 0xba, 0x59, 0x61, 0xcd, 0x43, 0xa8, 0xaf, 0xfa, 0xfd, 0xeb, 0xb1, 0x05, 0x92, 0x62, 0xee, 0x81, 0x8e, 0xe8, 0xc9, 0xfb, 0xd4, 0xfb, 0x13, 0x48, 0xbb, 0x9d, 0x57, 0xce, 0x58, 0x37, 0x37
 };
-
+*/
 /* Config data to encrypt - Replace with your actual config data */
 static uint8_t m_config_data[NRF_CRYPTO_EXAMPLE_AES_MAX_TEXT_SIZE] = {
     "ec2-18-234-99-151.compute-1.amazonaws.com"
@@ -130,7 +132,7 @@ int import_key(void)
     else if (status == PSA_ERROR_DOES_NOT_EXIST || status == PSA_ERROR_INVALID_HANDLE) {
         LOG_INF("Key not found, re-importing...");
         // Re-import key and set key_handle
-        status = psa_import_key(&key_attributes, m_aes_key, sizeof(m_aes_key), &key_handle);
+        status = psa_import_key(&key_attributes, aes_key, AES_KEY_SIZE, &key_handle);
         if (status != PSA_SUCCESS) {
             LOG_ERR("psa_import_key failed: %d", status);
             return PROVISIONING_ERROR_KEY_IMPORT;

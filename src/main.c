@@ -1,4 +1,5 @@
 #include <zephyr/kernel.h>
+#include "certs.h"
 #include <modem/modem_key_mgmt.h>
 #include <modem/nrf_modem_lib.h>
 #include <nrf_modem_gnss.h>
@@ -22,7 +23,7 @@
 #define HMAC_KEY_LEN 32
 
 
-// Your certificates here (null-terminated PEM)
+/*
 const char ca_cert[] = {0x2d, 0x2d, 0x2d, 0x2d, 0x2d, 0x42, 0x45, 0x47, 0x49, 0x4e, 0x20, 0x43, 0x45, 0x52, 0x54, 0x49,
 	0x46, 0x49, 0x43, 0x41, 0x54, 0x45, 0x2d, 0x2d, 0x2d, 0x2d, 0x2d, 0x0a, 0x4d, 0x49, 0x49, 0x46,
 	0x55, 0x7a, 0x43, 0x43, 0x41, 0x7a, 0x73, 0x43, 0x46, 0x44, 0x74, 0x6c, 0x76, 0x53, 0x54, 0x4e,
@@ -486,7 +487,7 @@ const char private_key[] = {
 	0x2d, 0x2d, 0x2d, 0x00,};
 	
 
-
+*/
 #define NRF_CRYPTO_EXAMPLE_HMAC_TEXT_SIZE (100)
 #define NRF_CRYPTO_EXAMPLE_HMAC_KEY_SIZE (32)
 #define SAMPLE_PERS_KEY_ID				PSA_KEY_ID_USER_MIN
@@ -546,7 +547,7 @@ int provision_all(void)
 	err = provision_cert(MODEM_KEY_MGMT_CRED_TYPE_CA_CHAIN, ca_cert);
 	printf("Provisioned CA chain: %d\n", err);
 
-	err = provision_cert(MODEM_KEY_MGMT_CRED_TYPE_PUBLIC_CERT, client_cert);
+	err = provision_cert(MODEM_KEY_MGMT_CRED_TYPE_PUBLIC_CERT, public_cert);
         printf("Provisioned client certificate: %d\n", err);
 
 	err = provision_cert(MODEM_KEY_MGMT_CRED_TYPE_PRIVATE_CERT, private_key);
