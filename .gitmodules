@@ -1,0 +1,3 @@
+[submodule "boards/kestrel_board"]
+	path = boards/kestrel_board
+	url = https://github.com/mitch680l/kestrel_board.git
