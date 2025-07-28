@@ -28,7 +28,7 @@
 #define MAX_AAD_LEN         64
 #define MAX_CIPHERTEXT_LEN  256
 
-#define ENCRYPTED_BLOB_ADDR ((const uint8_t *)0xFDF00)
+#define ENCRYPTED_BLOB_ADDR ((const uint8_t *)0xfb400)
 #define ENCRYPTED_BLOB_SIZE 2048
 
 typedef struct {
