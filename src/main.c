@@ -48,78 +48,78 @@ void parse_encrypted_blob(void)
     const uint8_t *ptr = ENCRYPTED_BLOB_ADDR;
     const uint8_t *end = ENCRYPTED_BLOB_ADDR + ENCRYPTED_BLOB_SIZE;
 
-    LOG_INF("🔍 Begin blob parsing at address %p, total size: %d", ptr, ENCRYPTED_BLOB_SIZE);
+    printk("🔍 Begin blob parsing at address %p, total size: %d", ptr, ENCRYPTED_BLOB_SIZE);
 
     if (memcmp(ptr, (uint8_t[]){0xAB, 0xCD, 0xEF, 0x12}, 4) != 0) {
-        LOG_ERR("❌ Invalid blob magic header");
+        printk("❌ Invalid blob magic header");
         return;
     }
 
     ptr += 4;
 
     if (ptr + 2 > end) {
-        LOG_ERR("❌ Not enough space for entry count");
+        printk("❌ Not enough space for entry count");
         return;
     }
 
     uint16_t entry_count = ptr[0] | (ptr[1] << 8);
     ptr += 2;
 
-    LOG_INF("🔍 Declared entry count: %d", entry_count);
+    printk("🔍 Declared entry count: %d", entry_count);
 
     for (int i = 0; i < entry_count && num_entries < MAX_ENTRIES; i++) {
         ConfigEntry *e = &entries[num_entries];
         int entry_offset = (int)(ptr - ENCRYPTED_BLOB_ADDR);
-        LOG_INF("➡️  Entry %d at offset %d", i, entry_offset);
+        printk("➡️  Entry %d at offset %d", i, entry_offset);
 
         if (ptr + 1 > end) {
-            LOG_ERR("❌ Not enough space to read IV length");
+            printk("❌ Not enough space to read IV length");
             break;
         }
         e->iv_len = *ptr++;
         if (e->iv_len > MAX_IV_LEN || ptr + e->iv_len > end) {
-            LOG_ERR("❌ Invalid or oversized IV length: %d at offset %d", e->iv_len, entry_offset);
-            LOG_HEXDUMP_INF(ptr - 4, 16, "🔍 Dump near IV failure");
+            printk("❌ Invalid or oversized IV length: %d at offset %d", e->iv_len, entry_offset);
+            
             break;
         }
         memcpy(e->iv, ptr, e->iv_len);
         ptr += e->iv_len;
 
         if (ptr + 2 > end) {
-            LOG_ERR("❌ Not enough space to read AAD length");
+            printk("❌ Not enough space to read AAD length");
             break;
         }
         e->aad_len = ptr[0] | (ptr[1] << 8);
         ptr += 2;
         if (e->aad_len > MAX_AAD_LEN || ptr + e->aad_len > end) {
-            LOG_ERR("❌ Invalid or oversized AAD length: %d", e->aad_len);
+            printk("❌ Invalid or oversized AAD length: %d", e->aad_len);
             break;
         }
         memcpy(e->aad, ptr, e->aad_len);
         ptr += e->aad_len;
 
         if (ptr + 2 > end) {
-            LOG_ERR("❌ Not enough space to read ciphertext+tag length");
+            printk("❌ Not enough space to read ciphertext+tag length");
             break;
         }
         e->ciphertext_len = ptr[0] | (ptr[1] << 8);
         ptr += 2;
         if (e->ciphertext_len > MAX_CIPHERTEXT_LEN || ptr + e->ciphertext_len > end) {
-            LOG_ERR("❌ Invalid or oversized ciphertext length: %d", e->ciphertext_len);
+            printk("❌ Invalid or oversized ciphertext length: %d", e->ciphertext_len);
             break;
         }
         memcpy(e->ciphertext, ptr, e->ciphertext_len);
         ptr += e->ciphertext_len;
 
-        LOG_INF("✅ Parsed entry %d: IV=%d, AAD=%d, Cipher+Tag=%d",
+        printk("✅ Parsed entry %d: IV=%d, AAD=%d, Cipher+Tag=%d",
                 num_entries, e->iv_len, e->aad_len, e->ciphertext_len);
 
         num_entries++;
         k_sleep(K_MSEC(10));
     }
 
-    LOG_INF("🟢 Total parsed entries: %d", num_entries);
-    LOG_INF("📍 Final pointer offset: %d / %d", (int)(ptr - ENCRYPTED_BLOB_ADDR), ENCRYPTED_BLOB_SIZE);
+    printk("🟢 Total parsed entries: %d", num_entries);
+    printk("📍 Final pointer offset: %d / %d", (int)(ptr - ENCRYPTED_BLOB_ADDR), ENCRYPTED_BLOB_SIZE);
 }
 
 /*
@@ -667,7 +667,7 @@ int main(void)
         printk("Starting provisioning...\n");
         provision_all();
         printk("Provisioning finished.\n");
-		k_sleep(K_MSEC(1000))
+		k_sleep(K_MSEC(1000));
 		parse_encrypted_blob();
 		k_sleep(K_MSEC(30000)); // Allow time for provisioning to complete
 		printk("INIT FOTA");
