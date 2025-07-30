@@ -23,6 +23,9 @@
 #define HMAC_KEY_LEN 32
 
 
+const uint8_t config_blob[];
+#define CONFIG_BLOB_ADDR  0xFB400
+
 #define MAX_ENTRIES            64
 #define ENTRY_SIZE             128
 #define MAX_IV_LEN             12
@@ -649,7 +652,7 @@ int main(void)
 
 		printf("✅ Parsed %d config entries\n", num_entries);
 		for (int i = 0; i < num_entries; i++) {
-			printf("  ➕ Entry %d at 0x%08X: AAD='%.*s', CT len=%d\n",
+			printf("Entry %d at 0x%08X: AAD='%.*s', CT len=%d\n",
 				i, entries[i].mem_offset,
 				entries[i].aad_len, entries[i].aad,
 				entries[i].ciphertext_len
