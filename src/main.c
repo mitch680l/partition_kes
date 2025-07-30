@@ -23,16 +23,15 @@
 #define HMAC_KEY_LEN 32
 
 
-const uint8_t config_blob[];
-#define CONFIG_BLOB_ADDR    0x000FB400U
+#define CONFIG_BLOB_ADDR        0x000FB400U
 
-#define MAX_ENTRIES            64
-#define ENTRY_SIZE             128
-#define MAX_IV_LEN             12
-#define MAX_AAD_LEN            32
-#define MAX_CIPHERTEXT_LEN     64
-#define BLOB_MAGIC             0x12EFCDAB
-#define BLOB_HEADER_SIZE       6           
+#define MAX_ENTRIES             64
+#define ENTRY_SIZE              128
+#define MAX_IV_LEN              12
+#define MAX_AAD_LEN             32
+#define MAX_CIPHERTEXT_LEN      64
+#define BLOB_MAGIC              0x12EFCDAB
+#define BLOB_HEADER_SIZE        6
 
 typedef struct {
     uint8_t iv[MAX_IV_LEN];
@@ -50,21 +49,31 @@ typedef struct {
 static ConfigEntry entries[MAX_ENTRIES];
 static int num_entries = 0;
 
-int parse_blob(const uint8_t *blob, size_t blob_size, uint32_t base_address) {
-    if (!blob || blob_size < BLOB_HEADER_SIZE) return -1;
+static inline uint16_t read_u16_le(const uint8_t *p) {
+    return p[0] | (p[1] << 8);
+}
 
-    uint32_t magic = blob[0] | (blob[1] << 8) | (blob[2] << 16) | (blob[3] << 24);
+static inline uint32_t read_u32_le(const uint8_t *p) {
+    return p[0] | (p[1] << 8) | (p[2] << 16) | (p[3] << 24);
+}
+
+int parse_blob_from_flash(size_t max_blob_size) {
+    const uint8_t *blob = (const uint8_t *)CONFIG_BLOB_ADDR;
+
+    if (!blob || max_blob_size < BLOB_HEADER_SIZE) return -1;
+
+    uint32_t magic = read_u32_le(&blob[0]);
     if (magic != BLOB_MAGIC) {
         printf("Invalid magic header: 0x%08X\n", magic);
         return -2;
     }
 
-    uint16_t entry_count = blob[4] | (blob[5] << 8);
+    uint16_t entry_count = read_u16_le(&blob[4]);
     if (entry_count > MAX_ENTRIES) return -3;
 
     size_t offset = BLOB_HEADER_SIZE;
     for (int i = 0; i < entry_count; i++) {
-        if (offset + ENTRY_SIZE > blob_size) return -4;
+        if (offset + ENTRY_SIZE > max_blob_size) return -4;
 
         const uint8_t *entry = &blob[offset];
         size_t pos = 0;
@@ -77,19 +86,19 @@ int parse_blob(const uint8_t *blob, size_t blob_size, uint32_t base_address) {
         memcpy(e->iv, &entry[pos], iv_len);
         pos += iv_len;
 
-        e->aad_len = entry[pos] | (entry[pos + 1] << 8);
+        e->aad_len = read_u16_le(&entry[pos]);
         pos += 2;
         if (e->aad_len > MAX_AAD_LEN) return -6;
         memcpy(e->aad, &entry[pos], e->aad_len);
         pos += e->aad_len;
 
-        e->ciphertext_len = entry[pos] | (entry[pos + 1] << 8);
+        e->ciphertext_len = read_u16_le(&entry[pos]);
         pos += 2;
         if (e->ciphertext_len > MAX_CIPHERTEXT_LEN) return -7;
         memcpy(e->ciphertext, &entry[pos], e->ciphertext_len);
         pos += e->ciphertext_len;
 
-        e->mem_offset = base_address + offset;
+        e->mem_offset = CONFIG_BLOB_ADDR + offset;
 
         offset += ENTRY_SIZE;
     }
@@ -179,7 +188,7 @@ int main(void)
         provision_all();
         printk("Provisioning finished.\n");
 		k_sleep(K_MSEC(1000));
-		int res = parse_blob(config_blob, 8000, CONFIG_BLOB_ADDR);
+		int res = parse_blob(8000);
 		if (res != 0) {
 			printf("❌ Failed to parse config blob (code %d)\n", res);
 			return res;
