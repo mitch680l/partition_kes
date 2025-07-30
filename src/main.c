@@ -23,8 +23,8 @@
 #define HMAC_KEY_LEN 32
 
 
-#define CONFIG_BLOB_ADDR        0x000FB400U
-
+#define CONFIG_BLOB_ADDR1        0x000FB400U
+#define CONFIG_BLOB_ADDR2 		0x000FD800U
 #define MAX_ENTRIES             64
 #define ENTRY_SIZE              128
 #define MAX_IV_LEN              12
@@ -57,8 +57,8 @@ static inline uint32_t read_u32_le(const uint8_t *p) {
     return p[0] | (p[1] << 8) | (p[2] << 16) | (p[3] << 24);
 }
 
-int parse_blob_from_flash(size_t max_blob_size) {
-    const uint8_t *blob = (const uint8_t *)CONFIG_BLOB_ADDR;
+int parse_blob_from_flash(size_t max_blob_size, unsigned int blob_add) {
+    const uint8_t *blob = (const uint8_t *)blob_add;
 
     if (!blob || max_blob_size < BLOB_HEADER_SIZE) return -1;
 
@@ -98,7 +98,7 @@ int parse_blob_from_flash(size_t max_blob_size) {
         memcpy(e->ciphertext, &entry[pos], e->ciphertext_len);
         pos += e->ciphertext_len;
 
-        e->mem_offset = CONFIG_BLOB_ADDR + offset;
+        e->mem_offset = blob_add + offset;
 
         offset += ENTRY_SIZE;
     }
@@ -188,7 +188,22 @@ int main(void)
         provision_all();
         printk("Provisioning finished.\n");
 		k_sleep(K_MSEC(1000));
-		int res = parse_blob_from_flash(8000);
+		int res = parse_blob_from_flash(8000,CONFIG_BLOB_ADDR1 );
+		if (res != 0) {
+			printf("❌ Failed to parse config blob (code %d)\n", res);
+			return res;
+		}
+
+		printf("✅ Parsed %d config entries\n", num_entries);
+		for (int i = 0; i < num_entries; i++) {
+			printf("Entry %d at 0x%08X: AAD='%.*s', CT len=%d\n",
+				i, entries[i].mem_offset,
+				entries[i].aad_len, entries[i].aad,
+				entries[i].ciphertext_len
+			);
+		}
+		k_sleep(K_MSEC(1000));
+		res = parse_blob_from_flash(8000,CONFIG_BLOB_ADDR2 );
 		if (res != 0) {
 			printf("❌ Failed to parse config blob (code %d)\n", res);
 			return res;
