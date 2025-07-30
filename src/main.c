@@ -188,7 +188,7 @@ int main(void)
         provision_all();
         printk("Provisioning finished.\n");
 		k_sleep(K_MSEC(1000));
-		int res = parse_blob(8000);
+		int res = parse_blob_from_flash(8000);
 		if (res != 0) {
 			printf("❌ Failed to parse config blob (code %d)\n", res);
 			return res;
