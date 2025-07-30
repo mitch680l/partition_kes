@@ -31,7 +31,7 @@
 #define MAX_AAD_LEN             32
 #define MAX_CIPHERTEXT_LEN      64
 #define BLOB_MAGIC              0x12EFCDAB
-#define BLOB_HEADER_SIZE        6
+#define BLOB_HEADER_SIZE        0
 
 typedef struct {
     uint8_t iv[MAX_IV_LEN];
@@ -62,14 +62,9 @@ int parse_blob_from_flash(size_t max_blob_size, unsigned int blob_add) {
 
     if (!blob || max_blob_size < BLOB_HEADER_SIZE) return -1;
 
-    uint32_t magic = read_u32_le(&blob[0]);
-    if (magic != BLOB_MAGIC) {
-        printf("Invalid magic header: 0x%08X\n", magic);
-        return -2;
-    }
+   
 
-    uint16_t entry_count = read_u16_le(&blob[4]);
-    if (entry_count > MAX_ENTRIES) return -3;
+    uint16_t entry_count = 10
 
     size_t offset = BLOB_HEADER_SIZE;
     for (int i = 0; i < entry_count; i++) {
