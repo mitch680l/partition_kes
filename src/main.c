@@ -64,7 +64,7 @@ int parse_blob_from_flash(size_t max_blob_size, unsigned int blob_add) {
 
    
 
-    uint16_t entry_count = 10
+    uint16_t entry_count = 10;
 
     size_t offset = BLOB_HEADER_SIZE;
     for (int i = 0; i < entry_count; i++) {
