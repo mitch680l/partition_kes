@@ -186,7 +186,6 @@ int main(void)
 		int res = parse_blob_from_flash(8000,CONFIG_BLOB_ADDR1 );
 		if (res != 0) {
 			printf("❌ Failed to parse config blob (code %d)\n", res);
-			return res;
 		}
 
 		printf("✅ Parsed %d config entries\n", num_entries);
