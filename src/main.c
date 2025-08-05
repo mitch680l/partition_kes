@@ -211,7 +211,7 @@ int main(void)
 				entries[i].ciphertext_len
 			);
 		}
-		k_sleep(K_MSEC(30000)); // Allow time for provisioning to complete
+		k_sleep(K_MSEC(5000)); // Allow time for provisioning to complete
 		printk("INIT FOTA");
 		fota_init_and_start();
 		printk("FOTA initialization complete.\n");
