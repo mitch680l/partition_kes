@@ -115,18 +115,20 @@ int parse_blob_from_flash(size_t max_blob_size, unsigned int blob_add) {
 LOG_MODULE_REGISTER(hmac, LOG_LEVEL_DBG);
 
 
-static int provision_cert(enum modem_key_mgmt_cred_type type, const char *data)
+static int provision_cert(enum modem_key_mgmt_cred_type type, const uint8_t *data, size_t data_len)
 {
-        printk("Provisioning certificate type %d...\n", type);
-        bool exists;
-        modem_key_mgmt_exists(TLS_SEC_TAG, type, &exists);
-	if (exists) { 
-                printk("Certificate type %d already exists.\n", type);
-		return 0;
-	}
-        printk("Writing certificate type %d...\n", type);
-	return modem_key_mgmt_write(TLS_SEC_TAG, type, data, strlen(data));
+    printk("Provisioning certificate type %d...\n", type);
+    bool exists;
+    modem_key_mgmt_exists(TLS_SEC_TAG, type, &exists);
+    if (exists) { 
+        printk("Certificate type %d already exists.\n", type);
+        return 0;
+    }
+
+    printk("Writing certificate type %d...\n", type);
+    return modem_key_mgmt_write(TLS_SEC_TAG, type, data, data_len);
 }
+
 
 
 psa_status_t key_exists(psa_key_id_t key_id)
@@ -158,14 +160,12 @@ int provision_all(void)
 		return err;
 	}
 
-	err = provision_cert(MODEM_KEY_MGMT_CRED_TYPE_CA_CHAIN, ca_cert);
-	printf("Provisioned CA chain: %d\n", err);
-
-	err = provision_cert(MODEM_KEY_MGMT_CRED_TYPE_PUBLIC_CERT, public_cert);
-        printf("Provisioned client certificate: %d\n", err);
-
-	err = provision_cert(MODEM_KEY_MGMT_CRED_TYPE_PRIVATE_CERT, private_key);
-        printf("Provisioned private key: %d\n", err);
+	err = provision_cert(MODEM_KEY_MGMT_CRED_TYPE_CA_CHAIN, ca_cert, ca_cert_len);
+    printk("provision ca_cert: %d\n", err);
+    err = provision_cert(MODEM_KEY_MGMT_CRED_TYPE_PUBLIC_CERT, public_cert, public_cert_len);
+    printk("provision public_cert: %d\n", err);
+    err = provision_cert(MODEM_KEY_MGMT_CRED_TYPE_PRIVATE_CERT, private_key, private_key_len);
+    printk("provision private_key: %d\n", err);
 
 	err = provision_config_data();
 	if (err) {
