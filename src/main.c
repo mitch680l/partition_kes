@@ -14,6 +14,10 @@
 #include <tfm_ns_interface.h>
 #include "fota.h"
 #include "enc.h"
+#include <zephyr/kernel.h>
+#include <zephyr/shell/shell.h>
+#include <zephyr/init.h>
+#include <zephyr/sys/printk.h>
 // Replace with your secure tag
 #define TLS_SEC_TAG 42
 
@@ -216,3 +220,8 @@ int main(void)
 		printk("FOTA initialization complete.\n");
         return 0;
 }
+
+
+
+
+
