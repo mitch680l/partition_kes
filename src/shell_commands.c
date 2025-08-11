@@ -87,10 +87,6 @@ static inline bool check_password(const char *pw)
     LOG_INF("pbkdf2.hash (hex str, raw): %s", hash_hex);
 
 
-    /* 2) Normalize (trim ws/quotes) in our local copies */
-    s_len = normalize_hex_string(salt_hex);
-    h_len = normalize_hex_string(hash_hex);
-
     /* 3) Hex -> bytes */
     uint8_t salt[64], hash_ref[64], cand[64];
     size_t salt_len = hex2bin(salt_hex, s_len, salt, sizeof(salt));
