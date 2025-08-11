@@ -19,12 +19,12 @@
 #include <zephyr/shell/shell.h>
 #include <zephyr/init.h>
 #include <zephyr/sys/printk.h>
-// Replace with your secure tag
+
 #define TLS_SEC_TAG 42
 
-// TF-M Protected Storage UID
 
-#define PBKDF2_ITERATIONS 150000u
+
+#define PBKDF2_ITERATIONS 64000u
 
 
 LOG_MODULE_REGISTER(hmac, LOG_LEVEL_DBG);
@@ -58,7 +58,7 @@ typedef struct {
     uint8_t ciphertext[MAX_CIPHERTEXT_LEN];
     uint16_t ciphertext_len;
 
-    uint32_t mem_offset;  // absolute memory offset of the entry
+    uint32_t mem_offset;  
 } ConfigEntry;
 
 static ConfigEntry entries[MAX_ENTRIES];
@@ -129,7 +129,6 @@ done:
 
 int test_pbkdf2_verify_from_blob_simple(void)
 {
-    /* Accept either “pdkdf2.*” (your earlier note) or “pbkdf2.*” (your logs) */
     const char* salt_keys[2]={"pdkdf2.salt","pbkdf2.salt"};
     const char* hash_keys[2]={"pdkdf2.hash","pbkdf2.hash"};
 
@@ -143,8 +142,6 @@ int test_pbkdf2_verify_from_blob_simple(void)
         LOG_INF("Salt/hash entries not found (salt:%d hash:%d)", !!e_salt, !!e_hash);
         return -1;
     }
-
-    /* 1) Decrypt to ASCII using YOUR decrypt_config_data() */
     char salt_hex[128]; size_t salt_hex_len=0;
     char hash_hex[256]; size_t hash_hex_len=0;
 
@@ -168,7 +165,6 @@ int test_pbkdf2_verify_from_blob_simple(void)
     }
     hash_hex[hash_hex_len]='\0';
 
-    /* 2) Hex-decode */
     uint8_t salt[64]; size_t salt_len=0;
     uint8_t hash_ref[64]; size_t hash_len=0;
     if(!hex_to_bytes(salt_hex, salt_hex_len, salt, &salt_len)){
@@ -178,7 +174,6 @@ int test_pbkdf2_verify_from_blob_simple(void)
         LOG_INF("Hash hex invalid"); return -5;
     }
 
-    /* 3) Derive candidate for correct and wrong passwords */
     const char* good="Kalscott123";
     const char* bad ="NotThePassword!";
 
@@ -195,7 +190,6 @@ int test_pbkdf2_verify_from_blob_simple(void)
                             cand_bad, hash_len);
     if(rc){ LOG_INF("PBKDF2 derive failed (bad)"); return -8; }
 
-    /* 4) Constant-time compares */
     uint8_t diff_good=0, diff_bad=0;
     for(size_t i=0;i<hash_len;i++){ diff_good|=(uint8_t)(cand_good[i]^hash_ref[i]); }
     for(size_t i=0;i<hash_len;i++){ diff_bad |=(uint8_t)(cand_bad [i]^hash_ref[i]); }
@@ -370,11 +364,11 @@ int provision_all(void)
 
 int main(void)
 {
-        k_sleep(K_MSEC(2000)); // Allow time for system initialization
+        k_sleep(K_MSEC(2000)); 
         printk("TESTING HMAC\n");
         test();
         printk("HMAC test completed.\n");
-        k_sleep(K_MSEC(1000)); // Allow time for system initialization
+        k_sleep(K_MSEC(1000));
         printk("Starting provisioning...\n");
         provision_all();
         printk("Provisioning finished.\n");
@@ -383,7 +377,7 @@ int main(void)
 
 		
 
-		printf("✅ Parsed %d config entries\n", num_entries);
+		printf("Parsed %d config entries\n", num_entries);
 		for (int i = 0; i < num_entries; i++) {
 			printf("Entry %d at 0x%08X: AAD='%.*s', CT len=%d\n",
 				i, entries[i].mem_offset,
@@ -393,9 +387,9 @@ int main(void)
 		}
 
 	
-		k_sleep(K_MSEC(5000)); // Allow time for provisioning to complete
+		k_sleep(K_MSEC(5000));
         test_pbkdf2_verify_from_blob_simple();
-        k_sleep(K_MSEC(1000)); // Allow time for test to complete
+        k_sleep(K_MSEC(1000));
 		printk("INIT FOTA");
 		fota_init_and_start();
 		printk("FOTA initialization complete.\n");
