@@ -23,7 +23,12 @@ LOG_MODULE_REGISTER(aes_gcm, LOG_LEVEL_DBG);
 #define LOCKOUT_MS       30000     
 #define AUTO_LOGOUT_MS   60000      
 #define TEST_PASSWORD    "Password" 
-
+#define PRINT_HEX(label, buf, len)                                      \
+    do {                                                                 \
+        LOG_INF("---- %s (len: %zu) ----", (label), (size_t)(len));      \
+        LOG_HEXDUMP_INF((buf), (len), "Content:");                       \
+        LOG_INF("---- %s end ----", (label));                            \
+    } while (0)
 /* --- state --- */
 static uint8_t  s_fail_count;
 static int64_t  s_lock_until_ms;    
