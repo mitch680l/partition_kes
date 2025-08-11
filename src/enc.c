@@ -67,7 +67,7 @@ static psa_key_handle_t key_handle;                  // PSA runtime key handle
 		LOG_INF("---- %s end  ----", p_label);		  \
 	})
 
-LOG_MODULE_REGISTER(aes_gcm, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(aes_gcm_enc, LOG_LEVEL_DBG);
 
 int crypto_init(void)
 {
