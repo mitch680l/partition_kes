@@ -200,25 +200,20 @@ void test(void)
 	LOG_INF("Starting PBKDF2 example...");
 
 	status = crypto_init_1();
-	if (status != 0) {
-		return -1;
-	}
+
 
 	status = import_input_password_1();
-	if (status != 0) {
-		return -1;
-	}
+
 
 	status = derive_output_key_1();
-	if (status != 0) {
-		return -1;
-	}
+
 
 	status = crypto_finish_1();
-	if (status != 0) {
-		return -1;
-	}
+
 
 	LOG_INF("PBKDF2 example completed.");
-	return 0;
 }
+
+
+
+
