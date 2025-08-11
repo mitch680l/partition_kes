@@ -27,8 +27,8 @@
 #define HMAC_KEY_LEN 32
 
 
-#define CONFIG_BLOB_ADDR1        0x000FB400U
-#define CONFIG_BLOB_ADDR2 		0x000FD800U
+#define CONFIG_BLOB_ADDR1        0x000FD000U
+#define CONFIG_BLOB_ADDR2 		0x000FE000U
 #define MAX_ENTRIES             64
 #define ENTRY_SIZE              128
 #define MAX_IV_LEN              12
