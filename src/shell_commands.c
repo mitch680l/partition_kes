@@ -151,7 +151,8 @@ static inline bool check_password(const char *pw)
                              cand, hash_len) != 0) {
         return false;
     }
-
+    PRINT_HEX("Derived PBKDF2",  cand,     hash_len);
+    PRINT_HEX("Reference PBKDF2",hash_ref, hash_len);
     bool ok = (consttime_cmp(cand, hash_ref, hash_len) == 0);
 
     memset(cand, 0, hash_len);
@@ -1048,7 +1049,7 @@ static int cmd_get_all(const struct shell *shell, size_t argc, char **argv)
 {
     ARG_UNUSED(argc); ARG_UNUSED(argv);
     AUTH_TOUCH();
-
+    
     shell_print(shell, "All configuration entries:");
     get_all_config_entries(shell);
     return 0;

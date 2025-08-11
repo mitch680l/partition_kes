@@ -26,6 +26,15 @@
 
 #define PBKDF2_ITERATIONS 64000u
 
+#define NRF_CRYPTO_EXAMPLE_HMAC_TEXT_SIZE (100)
+#define NRF_CRYPTO_EXAMPLE_HMAC_KEY_SIZE (32)
+#define SAMPLE_PERS_KEY_ID				PSA_KEY_ID_USER_MIN
+#define PRINT_HEX(p_label, p_text, len)\
+	({\
+		LOG_INF("---- %s (len: %u): ----", p_label, len);\
+		LOG_HEXDUMP_INF(p_text, len, "Content:");\
+		LOG_INF("---- %s end  ----", p_label);\
+	})
 
 LOG_MODULE_REGISTER(hmac, LOG_LEVEL_DBG);
 #define HMAC_KEY_ID ((psa_key_id_t)0x6001)
@@ -203,15 +212,6 @@ int test_pbkdf2_verify_from_blob_simple(void)
 
 
 
-#define NRF_CRYPTO_EXAMPLE_HMAC_TEXT_SIZE (100)
-#define NRF_CRYPTO_EXAMPLE_HMAC_KEY_SIZE (32)
-#define SAMPLE_PERS_KEY_ID				PSA_KEY_ID_USER_MIN
-#define PRINT_HEX(p_label, p_text, len)\
-	({\
-		LOG_INF("---- %s (len: %u): ----", p_label, len);\
-		LOG_HEXDUMP_INF(p_text, len, "Content:");\
-		LOG_INF("---- %s end  ----", p_label);\
-	})
 
 
 
