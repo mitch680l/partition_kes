@@ -71,8 +71,8 @@ int ktd2026_set_reset_mode(struct ktd2026_device *ktd_dev, enum ktd2026_reset_mo
     int ret = ktd2026_read_reg(ktd_dev, KTD2026_REG_EN_RST, &reg0);
     if (ret < 0) return ret;
 
-    reg0 &= ~0x07;             // clear bits [2:0]
-    reg0 |= (mode & 0x07);     // set reset/timer slot mode
+    reg0 &= ~GENMASK(2, 0);        // clear bits [2:0]
+    reg0 |= (mode & GENMASK(2, 0)); // set reset/timer slot mode
 
     return ktd2026_write_reg(ktd_dev, KTD2026_REG_EN_RST, reg0);
 }
@@ -98,8 +98,8 @@ static int ktd2026_update_reg0_enable_mode(struct ktd2026_device *ktd_dev, uint8
     int ret = ktd2026_read_reg(ktd_dev, KTD2026_REG_EN_RST, &reg0);
     if (ret < 0) return ret;
 
-    reg0 &= ~(0b11 << 3);         // clear bits [4:3]
-    reg0 |= (enable_mode & (0b11 << 3));
+    reg0 &= ~GENMASK(4, 3);         // clear bits [4:3]
+    reg0 |= (enable_mode & GENMASK(4, 3));
 
     return ktd2026_write_reg(ktd_dev, KTD2026_REG_EN_RST, reg0);
 }
@@ -132,8 +132,8 @@ static int ktd2026_update_reg0_rf_scaling(struct ktd2026_device *ktd_dev, uint8_
     int ret = ktd2026_read_reg(ktd_dev, KTD2026_REG_EN_RST, &reg0);
     if (ret < 0) return ret;
 
-    reg0 &= ~(0b11 << 5);         // clear bits [6:5]
-    reg0 |= (scale_mode & (0b11 << 5));
+    reg0 &= ~GENMASK(6, 5);         // clear bits [6:5]
+    reg0 |= (scale_mode & GENMASK(6, 5));
 
     return ktd2026_write_reg(ktd_dev, KTD2026_REG_EN_RST, reg0);
 }
@@ -244,8 +244,8 @@ int ktd2026_set_led_mode(struct ktd2026_device *ktd_dev, uint8_t led_index, enum
     }
 
     uint8_t shift = (led_index - 1) * 2;
-    reg4 &= ~(0b11 << shift);           // Clear the two bits for this LED
-    reg4 |= ((mode & 0b11) << shift);   // Set the new mode
+    reg4 &= ~(GENMASK(1, 0) << shift);      // Clear the two bits for this LED
+    reg4 |= ((mode & GENMASK(1, 0)) << shift); // Set the new mode
 
     return ktd2026_write_channel_ctrl(ktd_dev, reg4);
 }
@@ -260,7 +260,7 @@ int ktd2026_set_ramp_times(struct ktd2026_device *ktd_dev, uint8_t rise_index, u
     }
 
     // Reg5 = [7:4] Tfall | [3:0] Trise
-    uint8_t reg5 = ((fall_index & 0x0F) << 4) | (rise_index & 0x0F);
+    uint8_t reg5 = ((fall_index & GENMASK(3, 0)) << 4) | (rise_index & GENMASK(3, 0));
     return ktd2026_write_ramp_rate(ktd_dev, reg5);
 }
 

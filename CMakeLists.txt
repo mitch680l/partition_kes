@@ -12,5 +12,5 @@ target_sources(app PRIVATE src/aes.c)
 target_sources(app PRIVATE src/private.c)
 target_sources(app PRIVATE src/public.c)
 target_sources(app PRIVATE drivers/led/led_driver.c)
-target_sources(app PRIVATE src/led_shell.c)
+target_sources(app PRIVATE src/test.c)
 

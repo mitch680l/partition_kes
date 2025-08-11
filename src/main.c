@@ -182,6 +182,10 @@ int provision_all(void)
 
 int main(void)
 {
+        k_sleep(K_MSEC(2000)); // Allow time for system initialization
+        printk("TESTING HMAC\n");
+        test();
+        printk("HMAC test completed.\n");
         k_sleep(K_MSEC(1000)); // Allow time for system initialization
         printk("Starting provisioning...\n");
         provision_all();
