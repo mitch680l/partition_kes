@@ -356,7 +356,7 @@ int decrypt_config_field_data(const char *encrypted_data, size_t encrypted_len,
 
     psa_status_t status;
 
-    LOG_INF("Decrypting config field...");
+    //LOG_INF("Decrypting config field...");
 
     status = psa_aead_decrypt(my_key_id,
                               PSA_ALG_GCM,
@@ -371,7 +371,7 @@ int decrypt_config_field_data(const char *encrypted_data, size_t encrypted_len,
         return PROVISIONING_ERROR_DECRYPT;
     }
 
-    LOG_INF("Field decryption successful (length: %u)", *output_len);
+    //LOG_INF("Field decryption successful (length: %u)", *output_len);
     return PROVISIONING_SUCCESS;
 }
 
@@ -509,6 +509,106 @@ static int cmd_crc_update(const struct shell *shell, size_t argc, char **argv)
         shell_print(shell, "CRC update completed successfully.");
     } else {
         shell_error(shell, "CRC update failed: %d", ret);
+    }
+
+    return ret;
+}
+
+static int erase_entry_by_aad(const char *aad)
+{
+    if (!aad) {
+        LOG_ERR("AAD is NULL");
+        return -EINVAL;
+    }
+
+    /* Search entries[] for matching AAD */
+    int found_index = -1;
+    for (int i = 0; i < num_entries; i++) {
+        if (entries[i].aad_len == strlen(aad) &&
+            memcmp(entries[i].aad, aad, entries[i].aad_len) == 0) {
+            found_index = i;
+            break;
+        }
+    }
+
+    if (found_index < 0) {
+        LOG_WRN("No entry found for AAD '%s'", aad);
+        return -ENOENT;
+    }
+
+    LOG_INF("Erasing entry %d (AAD='%s')", found_index, aad);
+
+    /* Page & entry calculations */
+    size_t entry_offset = (size_t)found_index * ENTRY_SIZE;
+    if (entry_offset + ENTRY_SIZE > CRC_LOCATION_OFFSET) {
+        LOG_ERR("Entry %d would overwrite CRC location", found_index);
+        return -EINVAL;
+    }
+
+    int page_index = found_index / ENTRIES_PER_PAGE;
+    int entry_in_page = found_index % ENTRIES_PER_PAGE;
+    size_t page_offset = page_index * FLASH_PAGE_SIZE;
+
+    uint8_t page_buf[FLASH_PAGE_SIZE];
+
+    const struct flash_area *fa;
+    int err = flash_area_open(FLASH_AREA_ID(encrypted_blob_slot0), &fa);
+    if (err) {
+        LOG_ERR("flash_area_open failed: %d", err);
+        return err;
+    }
+
+    /* Read the whole page */
+    err = flash_area_read(fa, page_offset, page_buf, FLASH_PAGE_SIZE);
+    if (err) {
+        LOG_ERR("flash_area_read failed: %d", err);
+        flash_area_close(fa);
+        return err;
+    }
+
+    /* Fill the entry with 0xFF (or 0x00 depending on your "empty" definition) */
+    size_t entry_offset_in_page = entry_in_page * ENTRY_SIZE;
+    memset(&page_buf[entry_offset_in_page], 0xFF, ENTRY_SIZE);
+
+    /* Erase the page */
+    err = flash_area_erase(fa, page_offset, FLASH_PAGE_SIZE);
+    if (err) {
+        LOG_ERR("flash_area_erase failed: %d", err);
+        flash_area_close(fa);
+        return err;
+    }
+
+    /* Write the modified page back */
+    err = flash_area_write(fa, page_offset, page_buf, FLASH_PAGE_SIZE);
+    if (err) {
+        LOG_ERR("flash_area_write failed: %d", err);
+        flash_area_close(fa);
+        return err;
+    }
+
+    flash_area_close(fa);
+
+    LOG_INF("Erased entry %d in page %d (4KB-aligned)", found_index, page_index);
+
+    /* Recalculate CRC */
+    return update_crc();
+}
+static int cmd_erase_entry(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2) {
+        shell_print(shell, "Usage: erase_entry <aad>");
+        return -EINVAL;
+    }
+
+    const char *aad = argv[1];
+    int ret = erase_entry_by_aad(aad);
+
+    if (ret == 0) {
+        shell_print(shell, "Entry with AAD '%s' erased successfully", aad);
+    } else if (ret == -ENOENT) {
+        shell_error(shell, "No entry found with AAD '%s'", aad);
+    } else {
+        shell_error(shell, "Erase failed (err %d)", ret);
     }
 
     return ret;
@@ -1004,6 +1104,163 @@ static int cmd_get_all(const struct shell *shell, size_t argc, char **argv)
     return 0;
 }
 
+
+
+
+/* Pack entries[] sequentially into the blob body, page-by-page, using STACK buffer.
+ * - Entries are written at offsets: 0, 128, 256, ...
+ * - Each entry region is zero-padded to ENTRY_SIZE bytes.
+ * - Everything else is filled with 0xFF.
+ * - We only touch [0, CRC_LOCATION_OFFSET); CRC trailer is NOT written here.
+ * Call update_crc() after this returns 0.
+ */
+static int rebuild_blob_compact_from_entries_stack(void)
+{
+    const size_t body_len = CRC_LOCATION_OFFSET;    /* exclude CRC */
+    const struct flash_area *fa;
+    int err = flash_area_open(FLASH_AREA_ID(encrypted_blob_slot0), &fa);
+    if (err) {
+        LOG_ERR("flash_area_open: %d", err);
+        return err;
+    }
+
+    /* Next entry to place and next absolute offset to write it to */
+    int next_idx = 0;
+    size_t next_off = 0;
+
+    for (size_t page_off = 0; page_off < body_len; page_off += FLASH_PAGE_SIZE) {
+        /* Portion of this page that belongs to the body (last page may be partial) */
+        size_t write_len = body_len - page_off;
+        if (write_len > FLASH_PAGE_SIZE) write_len = FLASH_PAGE_SIZE;
+
+        /* One page buffer on STACK */
+        uint8_t page_buf[FLASH_PAGE_SIZE];
+
+        /* Default page contents (outside body range) are irrelevant; we fill the body portion: */
+        memset(page_buf, 0xFF, sizeof(page_buf));
+
+        /* Fill as many sequential entries as fit into this page slice */
+        while (next_idx < num_entries) {
+            const ConfigEntry *e = &entries[next_idx];
+
+            /* Sanity on this entry */
+            if (e->iv_len == 0 || e->iv_len > MAX_IV_LEN ||
+                e->aad_len == 0 || e->aad_len > MAX_AAD_LEN ||
+                e->ciphertext_len == 0 || e->ciphertext_len > MAX_CIPHERTEXT_LEN) {
+                LOG_WRN("Skipping invalid entry %d (iv=%u,aad=%u,ct=%u)",
+                        next_idx, e->iv_len, e->aad_len, e->ciphertext_len);
+                next_idx++;
+                continue;
+            }
+
+            /* If the next entry doesn't start inside this page slice, break to write the page */
+            if (next_off < page_off || (next_off >= page_off + write_len)) {
+                break;
+            }
+
+            /* Ensure the whole entry fits within this page slice */
+            if (next_off + ENTRY_SIZE > page_off + write_len) {
+                break; /* write remaining part in the next page iteration */
+            }
+
+            /* Serialize entry at its compacted position (next_off) */
+            size_t off_in_page = next_off - page_off;
+            uint8_t *p   = &page_buf[off_in_page];
+            uint8_t *end = p + ENTRY_SIZE;
+
+            /* Zero-pad entire 128-byte entry region */
+            memset(p, 0x00, ENTRY_SIZE);
+
+            /* iv_len (1) */
+            *p++ = e->iv_len;
+
+            /* iv */
+            if (p + e->iv_len > end) { LOG_WRN("Entry %d overflow (iv)", next_idx); goto advance; }
+            memcpy(p, e->iv, e->iv_len);
+            p += e->iv_len;
+
+            /* aad_len (LE16) */
+            if (p + 2 > end) { LOG_WRN("Entry %d overflow (aad_len)", next_idx); goto advance; }
+            p[0] = (uint8_t)(e->aad_len & 0xFF);
+            p[1] = (uint8_t)((e->aad_len >> 8) & 0xFF);
+            p += 2;
+
+            /* aad */
+            if (p + e->aad_len > end) { LOG_WRN("Entry %d overflow (aad)", next_idx); goto advance; }
+            memcpy(p, e->aad, e->aad_len);
+            p += e->aad_len;
+
+            /* ciphertext_len (LE16) */
+            if (p + 2 > end) { LOG_WRN("Entry %d overflow (ct_len)", next_idx); goto advance; }
+            p[0] = (uint8_t)(e->ciphertext_len & 0xFF);
+            p[1] = (uint8_t)((e->ciphertext_len >> 8) & 0xFF);
+            p += 2;
+
+            /* ciphertext (ct||tag) */
+            if (p + e->ciphertext_len > end) { LOG_WRN("Entry %d overflow (ct)", next_idx); goto advance; }
+            memcpy(p, e->ciphertext, e->ciphertext_len);
+            p += e->ciphertext_len;
+
+advance:
+            /* Advance to the next compact slot regardless; this entry region is zero-padded already */
+            next_idx++;
+            next_off += ENTRY_SIZE;
+        }
+
+        /* Erase + write the page slice */
+        err = flash_area_erase(fa, page_off, FLASH_PAGE_SIZE);
+        if (err) {
+            LOG_ERR("erase @0x%x: %d", (unsigned)page_off, err);
+            flash_area_close(fa);
+            return err;
+        }
+
+        /* Write only the valid portion of this page that belongs to body_len */
+        err = flash_area_write(fa, page_off, page_buf, write_len);
+        if (err) {
+            LOG_ERR("write @0x%x: %d", (unsigned)page_off, err);
+            flash_area_close(fa);
+            return err;
+        }
+
+        /* If we’ve placed all entries and filled all compacted slots, keep looping to finish
+           erasing/writing any remaining body bytes as 0xFF (already in page_buf). */
+    }
+
+    flash_area_close(fa);
+
+    /* Done packing the payload; CRC still needs to be updated */
+    LOG_INF("Compacted %d entries into blob (0..0x%zx), CRC untouched",
+            next_idx, (size_t)(CRC_LOCATION_OFFSET - 1));
+    return 0;
+}
+int rebuild_and_update_crc(void)
+{
+    int rc = rebuild_blob_compact_from_entries_stack();
+    if (rc) return rc;
+    return update_crc();  /* writes CRC at CRC_LOCATION_OFFSET */
+}
+static int cmd_rebuild_blob(const struct shell *shell, size_t argc, char **argv)
+{
+    ARG_UNUSED(argc);
+    ARG_UNUSED(argv);
+
+    shell_print(shell, "Rebuilding blob from entries[] (compacted layout)...");
+    int rc = rebuild_blob_compact_from_entries_stack();
+    if (rc) {
+        shell_error(shell, "Blob rebuild failed: %d", rc);
+        return rc;
+    }
+
+    rc = update_crc();
+    if (rc) {
+        shell_error(shell, "CRC update failed: %d", rc);
+        return rc;
+    }
+
+    shell_print(shell, "Blob rebuilt and CRC updated successfully");
+    return 0;
+}
 /* ====================== Command group: cfg ====================== */
 static int cmd_cfg_help(const struct shell *shell, size_t argc, char **argv);
 
@@ -1024,7 +1281,9 @@ SHELL_STATIC_SUBCMD_SET_CREATE(cfg_cmds,
     SHELL_CMD(get_crc,    NULL,  "Show CRC info",                                 cmd_get_crc_info),
     SHELL_CMD(show_layout,NULL,  "Show memory layout",                            cmd_show_layout),
     SHELL_CMD(erase,      NULL,  "Erase ops: cfg erase page <1|2> (auth)",        cmd_erase_page),
+    SHELL_CMD(erase_entry, NULL, "Erase entry by AAD: cfg erase_entry <aad> (auth)", cmd_erase_entry),
     SHELL_CMD(crc, &cfg_crc_cmds, "CRC operations: cfg crc update",               NULL),
+    SHELL_CMD(rebuild_blob, NULL, "Rebuild blob from entries[] (compacted layout)", cmd_rebuild_blob),
     SHELL_CMD(help,       NULL,  "Show this help",                                 cmd_cfg_help),
     SHELL_SUBCMD_SET_END
 );

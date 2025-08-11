@@ -303,7 +303,7 @@ int main(void)
 	
 		k_sleep(K_MSEC(5000));
         test_pbkdf2_verify_from_blob_simple();
-        k_sleep(K_MSEC(30000));
+        k_sleep(K_MSEC(300000));
 		printk("INIT FOTA");
 		fota_init_and_start();
 		printk("FOTA initialization complete.\n");
