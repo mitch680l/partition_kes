@@ -35,69 +35,10 @@ static int64_t  s_lock_until_ms;
 static int64_t  s_last_activity_ms; 
 static bool     s_authed;
 
-static inline const char *get_cfg_try2(const char *k1, const char *k2)
-{
-    const char *v = get_config(k1);
-    return v ? v : (k2 ? get_config(k2) : NULL);
-}
-
-static inline bool strip_quotes_copy(const char *in, char *out, size_t out_cap, size_t *out_len)
-{
-    if (!in || !out || out_cap == 0) return false;
-    size_t n = strlen(in);
-    if (n >= 2 && ((in[0] == '"' && in[n-1] == '"') || (in[0] == '\'' && in[n-1] == '\''))) {
-        if (n - 2 >= out_cap) return false;
-        memcpy(out, in + 1, n - 2);
-        out[n - 2] = '\0';
-        if (out_len) *out_len = n - 2;
-        return true;
-    }
-    if (n >= out_cap) return false;
-    memcpy(out, in, n + 1);
-    if (out_len) *out_len = n;
-    return true;
-}
-
-static inline int hex_nibble(char c)
-{
-    if (c >= '0' && c <= '9') return c - '0';
-    c = (char)tolower((unsigned char)c);
-    if (c >= 'a' && c <= 'f') return 10 + (c - 'a');
-    return -1;
-}
-
-static inline bool is_hex_str(const char *s, size_t n)
-{
-    if (n == 0 || (n & 1u)) return false;
-    for (size_t i = 0; i < n; i++) {
-        char c = s[i];
-        if (!((c >= '0' && c <= '9') ||
-              (c >= 'a' && c <= 'f') ||
-              (c >= 'A' && c <= 'F'))) return false;
-    }
-    return true;
-}
-
-static inline bool hex_to_bytes(const char *hex, size_t hex_len,
-                                uint8_t *out, size_t out_cap, size_t *out_len)
-{
-    if (!is_hex_str(hex, hex_len)) return false;
-    size_t n = hex_len / 2u;
-    if (n > out_cap) return false;
-    for (size_t i = 0; i < n; i++) {
-        int hi = hex_nibble(hex[2*i]), lo = hex_nibble(hex[2*i+1]);
-        if (hi < 0 || lo < 0) return false;
-        out[i] = (uint8_t)((hi << 4) | lo);
-    }
-    if (out_len) *out_len = n;
-    return true;
-}
-
-static inline int consttime_cmp(const uint8_t *a, const uint8_t *b, size_t len)
-{
+static inline int consttime_cmp(const uint8_t *a, const uint8_t *b, size_t len) {
     uint8_t diff = 0;
     for (size_t i = 0; i < len; i++) diff |= (uint8_t)(a[i] ^ b[i]);
-    return diff; 
+    return diff;  /* 0 == equal */
 }
 
 static inline int derive_pbkdf2_sha256(const uint8_t *pw, size_t pw_len,
@@ -108,60 +49,51 @@ static inline int derive_pbkdf2_sha256(const uint8_t *pw, size_t pw_len,
     psa_status_t st;
     psa_key_derivation_operation_t op = PSA_KEY_DERIVATION_OPERATION_INIT;
 
-    st = psa_key_derivation_setup(&op, PSA_ALG_PBKDF2_HMAC(PSA_ALG_SHA_256));
-    if (st != PSA_SUCCESS) goto done;
-
-    st = psa_key_derivation_input_integer(&op, PSA_KEY_DERIVATION_INPUT_COST, iters);
-    if (st != PSA_SUCCESS) goto done;
-
-    st = psa_key_derivation_input_bytes(&op, PSA_KEY_DERIVATION_INPUT_SALT, salt, salt_len);
-    if (st != PSA_SUCCESS) goto done;
-
-    st = psa_key_derivation_input_bytes(&op, PSA_KEY_DERIVATION_INPUT_PASSWORD, pw, pw_len);
-    if (st != PSA_SUCCESS) goto done;
-
+    st = psa_key_derivation_setup(&op, PSA_ALG_PBKDF2_HMAC(PSA_ALG_SHA_256)); if (st) goto done;
+    st = psa_key_derivation_input_integer(&op, PSA_KEY_DERIVATION_INPUT_COST, iters); if (st) goto done;
+    st = psa_key_derivation_input_bytes(&op, PSA_KEY_DERIVATION_INPUT_SALT, salt, salt_len); if (st) goto done;
+    st = psa_key_derivation_input_bytes(&op, PSA_KEY_DERIVATION_INPUT_PASSWORD, pw, pw_len); if (st) goto done;
     st = psa_key_derivation_output_bytes(&op, out, out_len);
-
 done:
     psa_key_derivation_abort(&op);
     return (st == PSA_SUCCESS) ? 0 : -1;
 }
 
+/* Drop-in replacement with hex debug prints */
 static inline bool check_password(const char *pw)
 {
     if (!pw) return false;
 
-    const char *salt_hex_c = get_cfg_try2("pbkdf2.salt", "pdkdf2.salt");
-    const char *hash_hex_c = get_cfg_try2("pbkdf2.hash", "pdkdf2.hash");
-    if (!salt_hex_c || !hash_hex_c) {
-        return false;
-    }
+    const char *salt_hex = get_config("pbkdf2.salt");
+    const char *hash_hex = get_config("pbkdf2.hash");
+    if (!salt_hex || !hash_hex) return false;
 
 
-    char salt_hex[128]; size_t salt_hex_len = 0;
-    char hash_hex[256]; size_t hash_hex_len = 0;
-    if (!strip_quotes_copy(salt_hex_c, salt_hex, sizeof(salt_hex), &salt_hex_len)) return false;
-    if (!strip_quotes_copy(hash_hex_c, hash_hex, sizeof(hash_hex), &hash_hex_len)) return false;
+    LOG_INF("PBKDF2 iters: %u", (unsigned)PBKDF2_ITERATIONS);
+    LOG_INF("pbkdf2.salt (hex str): %s", salt_hex);
+    LOG_INF("pbkdf2.hash (hex str): %s", hash_hex);
 
-    uint8_t salt[64]; size_t salt_len = 0;
-    uint8_t hash_ref[64]; size_t hash_len = 0;
-    if (!hex_to_bytes(salt_hex, salt_hex_len, salt, sizeof(salt), &salt_len)) return false;
-    if (!hex_to_bytes(hash_hex, hash_hex_len, hash_ref, sizeof(hash_ref), &hash_len)) return false;
 
-    uint8_t cand[64];
-    if (hash_len == 0 || hash_len > sizeof(cand)) return false;
+
+    uint8_t salt[64], hash_ref[64], cand[64];
+    size_t salt_len = hex2bin(salt_hex, strlen(salt_hex), salt, sizeof(salt));
+    size_t hash_len = hex2bin(hash_hex, strlen(hash_hex), hash_ref, sizeof(hash_ref));
+    if (salt_len == 0 || hash_len == 0 || hash_len > sizeof(cand)) return false;
+
+    PRINT_HEX("Salt (bytes)", salt, salt_len);
+    PRINT_HEX("Reference PBKDF2 (bytes)", hash_ref, hash_len);
+
 
     if (derive_pbkdf2_sha256((const uint8_t *)pw, strlen(pw),
                              salt, salt_len, PBKDF2_ITERATIONS,
                              cand, hash_len) != 0) {
         return false;
     }
-    PRINT_HEX("Derived PBKDF2",  cand,     hash_len);
-    PRINT_HEX("Reference PBKDF2",hash_ref, hash_len);
+
+    PRINT_HEX("Derived PBKDF2 (bytes)", cand, hash_len);
+
     bool ok = (consttime_cmp(cand, hash_ref, hash_len) == 0);
-
     memset(cand, 0, hash_len);
-
     return ok;
 }
 
