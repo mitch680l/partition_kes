@@ -79,174 +79,131 @@ static bool aad_equals_key(const ConfigEntry *e, const char *key)
     return (e->aad_len == klen) && (memcmp(e->aad, key, klen) == 0);
 }
 
-static int hex_nibble(char c)
-{
-    if (c >= '0' && c <= '9') return c - '0';
-    c = (char)tolower((unsigned char)c);
-    if (c >= 'a' && c <= 'f') return 10 + (c - 'a');
+static int hex_nibble(char c){
+    if (c>='0'&&c<='9') return c-'0';
+    c=(char)tolower((unsigned char)c);
+    if (c>='a'&&c<='f') return 10+(c-'a');
     return -1;
 }
-
-static bool hex_to_bytes(const char *hex, size_t hex_len, uint8_t *out, size_t *out_len)
-{
-    if ((hex_len & 1u) != 0u) return false;
-    size_t n = hex_len / 2u;
-    for (size_t i = 0; i < n; i++) {
-        int hi = hex_nibble(hex[2*i]);
-        int lo = hex_nibble(hex[2*i+1]);
-        if (hi < 0 || lo < 0) return false;
-        out[i] = (uint8_t)((hi << 4) | lo);
+static bool is_hex(const char* s,size_t n){
+    if(n==0||(n&1)) return false;
+    for(size_t i=0;i<n;i++){
+        char c=s[i];
+        if(!((c>='0'&&c<='9')||(c>='a'&&c<='f')||(c>='A'&&c<='F'))) return false;
     }
-    *out_len = n;
     return true;
 }
-
-static int consttime_cmp(const uint8_t *a, const uint8_t *b, size_t len)
-{
-    uint8_t diff = 0;
-    for (size_t i = 0; i < len; i++) diff |= (uint8_t)(a[i] ^ b[i]);
-    return diff; /* 0 == equal */
+static bool hex_to_bytes(const char*hex,size_t n,uint8_t*out,size_t*out_len){
+    if(!is_hex(hex,n)) return false;
+    size_t m=n/2;
+    for(size_t i=0;i<m;i++){
+        int hi=hex_nibble(hex[2*i]), lo=hex_nibble(hex[2*i+1]);
+        if(hi<0||lo<0) return false;
+        out[i]=(uint8_t)((hi<<4)|lo);
+    }
+    *out_len=m; return true;
 }
 
-/* Decrypt entry value into ASCII buffer (NUL terminated). */
-static int decrypt_entry_value_ascii(const ConfigEntry *e, char *out, size_t out_cap, size_t *out_len)
-{
-    size_t plain_len = 0;
-    if (out_cap == 0) return -1;
-
-    int rc = decrypt_config_data(e->ciphertext, e->ciphertext_len,
-                                 (uint8_t *)e->iv,
-                                 (uint8_t *)e->aad, e->aad_len,
-                                 (uint8_t *)out, &plain_len);
-    if (rc != 1) {
-        LOG_INF("decrypt_config_data failed for AAD '%.*s'", e->aad_len, e->aad);
-        return rc;
+static const ConfigEntry* find_entry(const char* key){
+    size_t klen=strlen(key);
+    for(int i=0;i<num_entries;i++){
+        if(entries[i].aad_len==klen && memcmp(entries[i].aad,key,klen)==0) return &entries[i];
     }
-    if (plain_len >= out_cap) {
-        LOG_INF("decrypted value too long for buffer");
-        return -2;
-    }
-    out[plain_len] = '\0';
-    if (out_len) *out_len = plain_len;
-    return 0;
+    return NULL;
 }
 
-/* Find and decrypt config value for a given key name. Tries both pdkdf2.* and pbkdf2.* */
-static int get_config_ascii_by_key(const char *key_primary, const char *key_fallback,
-                                   char *out, size_t out_cap, size_t *out_len)
-{
-    for (int pass = 0; pass < 2; pass++) {
-        const char *key = (pass == 0) ? key_primary : key_fallback;
-        if (!key) continue;
-        for (int i = 0; i < num_entries; i++) {
-            const ConfigEntry *e = &entries[i];
-            if (aad_equals_key(e, key)) {
-                return decrypt_entry_value_ascii(e, out, out_cap, out_len);
-            }
-        }
-    }
-    return -3; /* not found */
-}
-
-/* Derive PBKDF2-HMAC-SHA256 using PSA; out_len determines DK length */
-static int derive_pbkdf2_sha256(const uint8_t *password, size_t pw_len,
-                                const uint8_t *salt, size_t salt_len,
-                                uint32_t iterations,
-                                uint8_t *out, size_t out_len)
-{
+static int derive_pbkdf2_sha256(const uint8_t* pw,size_t pw_len,
+                                const uint8_t* salt,size_t salt_len,
+                                uint32_t iters,uint8_t*out,size_t out_len){
     psa_status_t st;
-    psa_key_derivation_operation_t op = PSA_KEY_DERIVATION_OPERATION_INIT;
-
-    st = psa_key_derivation_setup(&op, PSA_ALG_PBKDF2_HMAC(PSA_ALG_SHA_256));
-    if (st != PSA_SUCCESS) goto done;
-
-    st = psa_key_derivation_input_integer(&op, PSA_KEY_DERIVATION_INPUT_COST, iterations);
-    if (st != PSA_SUCCESS) goto done;
-
-    st = psa_key_derivation_input_bytes(&op, PSA_KEY_DERIVATION_INPUT_SALT, salt, salt_len);
-    if (st != PSA_SUCCESS) goto done;
-
-    st = psa_key_derivation_input_bytes(&op, PSA_KEY_DERIVATION_INPUT_PASSWORD, password, pw_len);
-    if (st != PSA_SUCCESS) goto done;
-
-    st = psa_key_derivation_output_bytes(&op, out, out_len);
-
+    psa_key_derivation_operation_t op=PSA_KEY_DERIVATION_OPERATION_INIT;
+    st=psa_key_derivation_setup(&op, PSA_ALG_PBKDF2_HMAC(PSA_ALG_SHA_256)); if(st) goto done;
+    st=psa_key_derivation_input_integer(&op, PSA_KEY_DERIVATION_INPUT_COST, iters); if(st) goto done;
+    st=psa_key_derivation_input_bytes(&op, PSA_KEY_DERIVATION_INPUT_SALT, salt, salt_len); if(st) goto done;
+    st=psa_key_derivation_input_bytes(&op, PSA_KEY_DERIVATION_INPUT_PASSWORD, pw, pw_len); if(st) goto done;
+    st=psa_key_derivation_output_bytes(&op, out, out_len);
 done:
     psa_key_derivation_abort(&op);
-    return (st == PSA_SUCCESS) ? 0 : -1;
+    return st==PSA_SUCCESS?0:-1;
 }
 
-/* ---- The test you asked for ----
-   Uses password "Kalscott123" (correct) and "NotThePassword!" (wrong) */
-int test_pbkdf2_verify_from_blob(void)
+int test_pbkdf2_verify_from_blob_simple(void)
 {
-    /* 1) Fetch and decrypt salt + hash from entries[] */
-    char salt_hex[128]; size_t salt_hex_len = 0;
-    char hash_hex[256]; size_t hash_hex_len = 0;
+    /* Accept either “pdkdf2.*” (your earlier note) or “pbkdf2.*” (your logs) */
+    const char* salt_keys[2]={"pdkdf2.salt","pbkdf2.salt"};
+    const char* hash_keys[2]={"pdkdf2.hash","pbkdf2.hash"};
 
-    int rc;
+    const ConfigEntry* e_salt=NULL; 
+    const ConfigEntry* e_hash=NULL;
 
-    rc = get_config_ascii_by_key("pdkdf2.salt", "pbkdf2.salt",
-                                 salt_hex, sizeof(salt_hex), &salt_hex_len);
-    if (rc) {
-        LOG_INF("Salt not found/decrypt failed (rc=%d)", rc);
-        return rc;
+    for(int i=0;i<2 && !e_salt;i++) e_salt=find_entry(salt_keys[i]);
+    for(int i=0;i<2 && !e_hash;i++) e_hash=find_entry(hash_keys[i]);
+
+    if(!e_salt || !e_hash){
+        LOG_INF("Salt/hash entries not found (salt:%d hash:%d)", !!e_salt, !!e_hash);
+        return -1;
     }
 
-    rc = get_config_ascii_by_key("pdkdf2.hash", "pbkdf2.hash",
-                                 hash_hex, sizeof(hash_hex), &hash_hex_len);
-    if (rc) {
-        LOG_INF("Hash not found/decrypt failed (rc=%d)", rc);
-        return rc;
+    /* 1) Decrypt to ASCII using YOUR decrypt_config_data() */
+    char salt_hex[128]; size_t salt_hex_len=0;
+    char hash_hex[256]; size_t hash_hex_len=0;
+
+    int rc=decrypt_config_data(e_salt->ciphertext, e_salt->ciphertext_len,
+                               (uint8_t*)e_salt->iv,
+                               (uint8_t*)e_salt->aad, e_salt->aad_len,
+                               (uint8_t*)salt_hex, &salt_hex_len);
+    if(rc!=0 || salt_hex_len==0 || salt_hex_len>=sizeof(salt_hex)){
+        LOG_INF("Salt decrypt failed rc=%d len=%u", rc, (unsigned)salt_hex_len);
+        return -2;
+    }
+    salt_hex[salt_hex_len]='\0';
+
+    rc=decrypt_config_data(e_hash->ciphertext, e_hash->ciphertext_len,
+                           (uint8_t*)e_hash->iv,
+                           (uint8_t*)e_hash->aad, e_hash->aad_len,
+                           (uint8_t*)hash_hex, &hash_hex_len);
+    if(rc!=0 || hash_hex_len==0 || hash_hex_len>=sizeof(hash_hex)){
+        LOG_INF("Hash decrypt failed rc=%d len=%u", rc, (unsigned)hash_hex_len);
+        return -3;
+    }
+    hash_hex[hash_hex_len]='\0';
+
+    /* 2) Hex-decode */
+    uint8_t salt[64]; size_t salt_len=0;
+    uint8_t hash_ref[64]; size_t hash_len=0;
+    if(!hex_to_bytes(salt_hex, salt_hex_len, salt, &salt_len)){
+        LOG_INF("Salt hex invalid"); return -4;
+    }
+    if(!hex_to_bytes(hash_hex, hash_hex_len, hash_ref, &hash_len)){
+        LOG_INF("Hash hex invalid"); return -5;
     }
 
-    /* 2) Hex-decode both */
-    uint8_t salt[64]; size_t salt_len = 0;
-    uint8_t hash_ref[64]; size_t hash_len = 0;
+    /* 3) Derive candidate for correct and wrong passwords */
+    const char* good="Kalscott123";
+    const char* bad ="NotThePassword!";
 
-    if (!hex_to_bytes(salt_hex, salt_hex_len, salt, &salt_len)) {
-        LOG_INF("Salt hex decode failed");
-        return -4;
-    }
-    if (!hex_to_bytes(hash_hex, hash_hex_len, hash_ref, &hash_len)) {
-        LOG_INF("Hash hex decode failed");
-        return -5;
-    }
+    uint8_t cand_good[64], cand_bad[64];
+    if(hash_len>sizeof(cand_good)) { LOG_INF("Hash too long"); return -6; }
 
-    /* 3) Derive with the correct password */
-    const char *good_pw = "Kalscott123";
-    uint8_t cand_good[64];
-    if (hash_len > sizeof(cand_good)) {
-        LOG_INF("Stored hash too long");
-        return -6;
-    }
-    rc = derive_pbkdf2_sha256((const uint8_t *)good_pw, strlen(good_pw),
-                              salt, salt_len, PBKDF2_ITERATIONS,
-                              cand_good, hash_len);
-    if (rc) {
-        LOG_INF("PBKDF2 derive failed for correct password");
-        return rc;
-    }
+    rc=derive_pbkdf2_sha256((const uint8_t*)good, strlen(good),
+                            salt, salt_len, PBKDF2_ITERATIONS,
+                            cand_good, hash_len);
+    if(rc){ LOG_INF("PBKDF2 derive failed (good)"); return -7; }
 
-    int eq_good = consttime_cmp(cand_good, hash_ref, hash_len);
-    LOG_INF("PBKDF2 verify (correct pw): %s", (eq_good == 0) ? "PASS" : "FAIL");
+    rc=derive_pbkdf2_sha256((const uint8_t*)bad, strlen(bad),
+                            salt, salt_len, PBKDF2_ITERATIONS,
+                            cand_bad, hash_len);
+    if(rc){ LOG_INF("PBKDF2 derive failed (bad)"); return -8; }
 
-    /* 4) Derive with a wrong password */
-    const char *bad_pw = "NotThePassword!";
-    uint8_t cand_bad[64];
-    rc = derive_pbkdf2_sha256((const uint8_t *)bad_pw, strlen(bad_pw),
-                              salt, salt_len, PBKDF2_ITERATIONS,
-                              cand_bad, hash_len);
-    if (rc) {
-        LOG_INF("PBKDF2 derive failed for wrong password");
-        return rc;
-    }
+    /* 4) Constant-time compares */
+    uint8_t diff_good=0, diff_bad=0;
+    for(size_t i=0;i<hash_len;i++){ diff_good|=(uint8_t)(cand_good[i]^hash_ref[i]); }
+    for(size_t i=0;i<hash_len;i++){ diff_bad |=(uint8_t)(cand_bad [i]^hash_ref[i]); }
 
-    int eq_bad = consttime_cmp(cand_bad, hash_ref, hash_len);
-    LOG_INF("PBKDF2 verify (wrong pw):   %s", (eq_bad == 0) ? "PASS (unexpected)" : "FAIL (expected)");
+    LOG_INF("PBKDF2 verify (correct): %s", diff_good==0 ? "PASS" : "FAIL");
+    LOG_INF("PBKDF2 verify (wrong):   %s", diff_bad ==0 ? "PASS (unexpected)" : "FAIL (expected)");
 
-    /* 5) Return overall status: 0 if good passed and bad failed */
-    return (eq_good == 0 && eq_bad != 0) ? 0 : -7;
+    return (diff_good==0 && diff_bad!=0) ? 0 : -9;
 }
 
 uint32_t manual_crc32(const uint8_t *data, size_t len) {
@@ -437,7 +394,7 @@ int main(void)
 
 	
 		k_sleep(K_MSEC(5000)); // Allow time for provisioning to complete
-        test_pbkdf2_verify_from_blob();
+        test_pbkdf2_verify_from_blob_simple();
         k_sleep(K_MSEC(1000)); // Allow time for test to complete
 		printk("INIT FOTA");
 		fota_init_and_start();
