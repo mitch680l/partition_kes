@@ -17,7 +17,7 @@
 #define BLOB_HEADER_SIZE 0
 #define ENTRY_SIZE 128
 
-#define MAX_ENTRIES         16
+#define MAX_ENTRIES         63
 #define MAX_IV_LEN          16
 #define MAX_AAD_LEN         64
 #define MAX_CIPHERTEXT_LEN  256
