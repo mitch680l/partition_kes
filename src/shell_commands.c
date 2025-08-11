@@ -64,32 +64,48 @@ static inline bool check_password(const char *pw)
 {
     if (!pw) return false;
 
-    const char *salt_hex = get_config("pbkdf2.salt");
-    const char *hash_hex = get_config("pbkdf2.hash");
-    if (!salt_hex || !hash_hex) return false;
+    /* 1) COPY OUT the static results immediately */
+    char salt_hex[128];
+    char hash_hex[256];
+
+    const char *s_ptr = get_config("pbkdf2.salt");
+    if (!s_ptr) return false;
+    /* strnlen guard + copy with termination */
+    size_t s_len = strnlen(s_ptr, sizeof(salt_hex) - 1);
+    memcpy(salt_hex, s_ptr, s_len);
+    salt_hex[s_len] = '\0';
+
+    const char *h_ptr = get_config("pbkdf2.hash");
+    if (!h_ptr) return false;
+    size_t h_len = strnlen(h_ptr, sizeof(hash_hex) - 1);
+    memcpy(hash_hex, h_ptr, h_len);
+    hash_hex[h_len] = '\0';
 
 
-    LOG_INF("PBKDF2 iters: %u", (unsigned)PBKDF2_ITERATIONS);
-    LOG_INF("pbkdf2.salt (hex str): %s", salt_hex);
-    LOG_INF("pbkdf2.hash (hex str): %s", hash_hex);
+    LOG_INF("PBKDF2 iterations: %u", (unsigned)PBKDF2_ITERATIONS);
+    LOG_INF("pbkdf2.salt (hex str, raw): %s", salt_hex);
+    LOG_INF("pbkdf2.hash (hex str, raw): %s", hash_hex);
 
 
+    /* 2) Normalize (trim ws/quotes) in our local copies */
+    s_len = normalize_hex_string(salt_hex);
+    h_len = normalize_hex_string(hash_hex);
 
+    /* 3) Hex -> bytes */
     uint8_t salt[64], hash_ref[64], cand[64];
-    size_t salt_len = hex2bin(salt_hex, strlen(salt_hex), salt, sizeof(salt));
-    size_t hash_len = hex2bin(hash_hex, strlen(hash_hex), hash_ref, sizeof(hash_ref));
+    size_t salt_len = hex2bin(salt_hex, s_len, salt, sizeof(salt));
+    size_t hash_len = hex2bin(hash_hex, h_len, hash_ref, sizeof(hash_ref));
     if (salt_len == 0 || hash_len == 0 || hash_len > sizeof(cand)) return false;
 
     PRINT_HEX("Salt (bytes)", salt, salt_len);
     PRINT_HEX("Reference PBKDF2 (bytes)", hash_ref, hash_len);
 
-
+    /* 4) Derive & compare */
     if (derive_pbkdf2_sha256((const uint8_t *)pw, strlen(pw),
                              salt, salt_len, PBKDF2_ITERATIONS,
                              cand, hash_len) != 0) {
         return false;
     }
-
     PRINT_HEX("Derived PBKDF2 (bytes)", cand, hash_len);
 
     bool ok = (consttime_cmp(cand, hash_ref, hash_len) == 0);
