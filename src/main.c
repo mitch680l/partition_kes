@@ -423,6 +423,7 @@ int main(void)
         printk("Provisioning finished.\n");
 		k_sleep(K_MSEC(1000));
 		parse_encrypted_blob();
+
 		
 
 		printf("✅ Parsed %d config entries\n", num_entries);
@@ -436,6 +437,8 @@ int main(void)
 
 	
 		k_sleep(K_MSEC(5000)); // Allow time for provisioning to complete
+        test_pbkdf2_verify_from_blob();
+        k_sleep(K_MSEC(1000)); // Allow time for test to complete
 		printk("INIT FOTA");
 		fota_init_and_start();
 		printk("FOTA initialization complete.\n");
