@@ -19,7 +19,7 @@
 #include <zephyr/shell/shell.h>
 #include <zephyr/init.h>
 #include <zephyr/sys/printk.h>
-
+#include <ctype.h>
 #define TLS_SEC_TAG 42
 
 
@@ -82,6 +82,7 @@ static inline uint32_t read_u32_le(const uint8_t *p) {
 }
 
 
+
 static bool aad_equals_key(const ConfigEntry *e, const char *key)
 {
     size_t klen = strlen(key);
@@ -136,78 +137,7 @@ done:
     return st==PSA_SUCCESS?0:-1;
 }
 
-int test_pbkdf2_verify_from_blob_simple(void)
-{
-    const char* salt_keys[2]={"pdkdf2.salt","pbkdf2.salt"};
-    const char* hash_keys[2]={"pdkdf2.hash","pbkdf2.hash"};
 
-    const ConfigEntry* e_salt=NULL; 
-    const ConfigEntry* e_hash=NULL;
-
-    for(int i=0;i<2 && !e_salt;i++) e_salt=find_entry(salt_keys[i]);
-    for(int i=0;i<2 && !e_hash;i++) e_hash=find_entry(hash_keys[i]);
-
-    if(!e_salt || !e_hash){
-        LOG_INF("Salt/hash entries not found (salt:%d hash:%d)", !!e_salt, !!e_hash);
-        return -1;
-    }
-    char salt_hex[128]; size_t salt_hex_len=0;
-    char hash_hex[256]; size_t hash_hex_len=0;
-
-    int rc=decrypt_config_data(e_salt->ciphertext, e_salt->ciphertext_len,
-                               (uint8_t*)e_salt->iv,
-                               (uint8_t*)e_salt->aad, e_salt->aad_len,
-                               (uint8_t*)salt_hex, &salt_hex_len);
-    if(rc!=0 || salt_hex_len==0 || salt_hex_len>=sizeof(salt_hex)){
-        LOG_INF("Salt decrypt failed rc=%d len=%u", rc, (unsigned)salt_hex_len);
-        return -2;
-    }
-    salt_hex[salt_hex_len]='\0';
-
-    rc=decrypt_config_data(e_hash->ciphertext, e_hash->ciphertext_len,
-                           (uint8_t*)e_hash->iv,
-                           (uint8_t*)e_hash->aad, e_hash->aad_len,
-                           (uint8_t*)hash_hex, &hash_hex_len);
-    if(rc!=0 || hash_hex_len==0 || hash_hex_len>=sizeof(hash_hex)){
-        LOG_INF("Hash decrypt failed rc=%d len=%u", rc, (unsigned)hash_hex_len);
-        return -3;
-    }
-    hash_hex[hash_hex_len]='\0';
-
-    uint8_t salt[64]; size_t salt_len=0;
-    uint8_t hash_ref[64]; size_t hash_len=0;
-    if(!hex_to_bytes(salt_hex, salt_hex_len, salt, &salt_len)){
-        LOG_INF("Salt hex invalid"); return -4;
-    }
-    if(!hex_to_bytes(hash_hex, hash_hex_len, hash_ref, &hash_len)){
-        LOG_INF("Hash hex invalid"); return -5;
-    }
-
-    const char* good="Kalscott123";
-    const char* bad ="NotThePassword!";
-
-    uint8_t cand_good[64], cand_bad[64];
-    if(hash_len>sizeof(cand_good)) { LOG_INF("Hash too long"); return -6; }
-
-    rc=derive_pbkdf2_sha256((const uint8_t*)good, strlen(good),
-                            salt, salt_len, PBKDF2_ITERATIONS,
-                            cand_good, hash_len);
-    if(rc){ LOG_INF("PBKDF2 derive failed (good)"); return -7; }
-
-    rc=derive_pbkdf2_sha256((const uint8_t*)bad, strlen(bad),
-                            salt, salt_len, PBKDF2_ITERATIONS,
-                            cand_bad, hash_len);
-    if(rc){ LOG_INF("PBKDF2 derive failed (bad)"); return -8; }
-
-    uint8_t diff_good=0, diff_bad=0;
-    for(size_t i=0;i<hash_len;i++){ diff_good|=(uint8_t)(cand_good[i]^hash_ref[i]); }
-    for(size_t i=0;i<hash_len;i++){ diff_bad |=(uint8_t)(cand_bad [i]^hash_ref[i]); }
-
-    LOG_INF("PBKDF2 verify (correct): %s", diff_good==0 ? "PASS" : "FAIL");
-    LOG_INF("PBKDF2 verify (wrong):   %s", diff_bad ==0 ? "PASS (unexpected)" : "FAIL (expected)");
-
-    return (diff_good==0 && diff_bad!=0) ? 0 : -9;
-}
 
 
 
@@ -287,7 +217,7 @@ int main(void)
         provision_all();
         printk("Provisioning finished.\n");
 		k_sleep(K_MSEC(1000));
-		parse_encrypted_blob();
+		//parse_encrypted_blob();
 
 		
 
@@ -302,7 +232,7 @@ int main(void)
 
 	
 		k_sleep(K_MSEC(5000));
-        test_pbkdf2_verify_from_blob_simple();
+        //test_pbkdf2_verify_from_blob_simple();
         k_sleep(K_MSEC(300000));
 		printk("INIT FOTA");
 		fota_init_and_start();
