@@ -1310,6 +1310,8 @@ static int cmd_cfg_help(const struct shell *shell, size_t argc, char **argv)
         "  get_crc                       Show CRC information\n"
         "  crc update                    Recompute/write CRC (auth)\n"
         "  show_layout                   Show blob memory layout\n"
+        "  rebuild_blob                Rebuild blob from entries[] (compacted layout)\n"
+        "  erase_entry <aad>             Erase entry by AAD (auth)\n"
         "  erase page <1|2>              Erase page (auth)\n"
         "\nAuth:\n"
         "  login <password>              Authenticate (default: \"" TEST_PASSWORD "\")\n"
