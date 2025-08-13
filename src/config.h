@@ -1,3 +1,6 @@
+#include <stdbool.h>
+#include <stdint.h>
+
 #define GPS_READ_BUFFER_SIZE 126  
 #define GPS_STARTUP_DELAY_MS 2000  
 #define GPS_CONFIG_TIMEOUT_MS 500  
@@ -52,19 +55,12 @@
 #define AES_KEY_SIZE (32) 
 #define DECRYPTED_OUTPUT_MAX 256
 
-#define DEFAULT_BROKER_HOST "18.234.99.151"
-#define DEFAULT_FOTA_HOST "18.234.99.151"
-#define DEFAULT_MQTT_BROKER_PORT 8883
-#define DEFAULT_INTERVAL_MQTT 100
-#define DEFAULT_FOTA_INTERVAL_MS (1000 * 60 * 1000)
-#define DEFAULT_ENABLE_IRIDIUM false
-#define DEFAULT_GPS_TARGET_RATE 25
 
 
 #define MAX_TRIES        3
 #define LOCKOUT_MS       30000     
 #define AUTO_LOGOUT_MS   60000      
-#define TEST_PASSWORD    "Password" 
+
 #define MAX_BLOB (8 * 1024) 
 #define PBKDF2_ITERATIONS 64000u
 extern char mqtt_client_id[MQTT_MAX_STR_LEN];               
@@ -87,3 +83,60 @@ extern struct mqtt_utf8 struct_user;
 void set_user_pass(void);
 void clear_user_pass(void);
 void config_init();
+
+typedef struct {
+    bool lte_en;
+    bool irid_en;
+    bool psm_en;
+    bool hw_en;
+    bool mdm_en;
+    bool gnss_en;
+    bool imu_en;
+    bool comp_en;
+    bool baro_en;
+    bool mqtt_en;
+    bool ota_en;
+    bool debug_mode;
+    bool factory_mode;
+
+} system_enable_t;
+
+extern system_enable_t sys_enable_config;
+#define SYS_EN_LTE_EN        (1 << 0)
+#define SYS_EN_IRID_EN       (1 << 1)
+#define SYS_EN_PSM_EN        (1 << 2)
+#define SYS_EN_HW_EN         (1 << 3)
+#define SYS_EN_MDM_EN        (1 << 4)
+#define SYS_EN_GNSS_EN       (1 << 5)
+#define SYS_EN_IMU_EN        (1 << 6)
+#define SYS_EN_COMP_EN       (1 << 7)
+#define SYS_EN_BARO_EN       (1 << 8)
+#define SYS_EN_MQTT_EN       (1 << 9)
+#define SYS_EN_OTA_EN        (1 << 10)
+#define SYS_EN_DEBUG_MODE    (1 << 11)
+#define SYS_EN_FACTORY_MODE  (1 << 12)
+
+typedef struct {
+    int publish_rate;
+    char broker_addr[64];
+    int broker_port;
+    char client_id[64];
+    char username[64];
+    char password[64];
+    bool tls_enabled;
+    int qos;
+} mqtt_config_t;
+
+
+typedef struct {
+    int check_interval;
+    char server_addr[64];
+    int server_port;
+    char username[64];
+    char password[64];
+    bool tls_enabled;
+    char cert_tag[64];
+} ota_config_t;
+
+extern mqtt_config_t *mqtt_config;
+extern ota_config_t *ota_config;

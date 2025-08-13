@@ -18,7 +18,18 @@ psa_key_handle_t my_key_handle;
 
 LOG_MODULE_REGISTER(aes_gcm, LOG_LEVEL_DBG);
 
+typedef struct {
+    uint8_t iv[MAX_IV_LEN];
+    uint8_t iv_len;
+    uint8_t aad[MAX_AAD_LEN];
+    uint16_t aad_len;
+    uint8_t ciphertext[MAX_CIPHERTEXT_LEN];
+    uint16_t ciphertext_len;
+    uint32_t mem_offset;
+} ConfigEntry;
 
+static ConfigEntry entries[MAX_ENTRIES];
+static int num_entries = 0;
 
 #define PRINT_HEX(label, buf, len)                                      \
     do {                                                                 \
@@ -59,7 +70,7 @@ done:
     return (st == PSA_SUCCESS) ? 0 : -1;
 }
 
-/* Drop-in replacement with hex debug prints */
+
 static inline bool check_password(const char *pw)
 {
     if (!pw) return false;
@@ -82,9 +93,6 @@ static inline bool check_password(const char *pw)
     hash_hex[h_len] = '\0';
 
 
-    LOG_INF("PBKDF2 iterations: %u", (unsigned)PBKDF2_ITERATIONS);
-    LOG_INF("pbkdf2.salt (hex str, raw): %s", salt_hex);
-    LOG_INF("pbkdf2.hash (hex str, raw): %s", hash_hex);
 
 
     /* 3) Hex -> bytes */
@@ -93,8 +101,6 @@ static inline bool check_password(const char *pw)
     size_t hash_len = hex2bin(hash_hex, h_len, hash_ref, sizeof(hash_ref));
     if (salt_len == 0 || hash_len == 0 || hash_len > sizeof(cand)) return false;
 
-    PRINT_HEX("Salt (bytes)", salt, salt_len);
-    PRINT_HEX("Reference PBKDF2 (bytes)", hash_ref, hash_len);
 
     /* 4) Derive & compare */
     if (derive_pbkdf2_sha256((const uint8_t *)pw, strlen(pw),
@@ -102,7 +108,7 @@ static inline bool check_password(const char *pw)
                              cand, hash_len) != 0) {
         return false;
     }
-    PRINT_HEX("Derived PBKDF2 (bytes)", cand, hash_len);
+
 
     bool ok = (consttime_cmp(cand, hash_ref, hash_len) == 0);
     memset(cand, 0, hash_len);
@@ -211,18 +217,7 @@ static int shell_lockdown_init(void)
 SYS_INIT(shell_lockdown_init, APPLICATION, 50);
 
 
-typedef struct {
-    uint8_t iv[MAX_IV_LEN];
-    uint8_t iv_len;
-    uint8_t aad[MAX_AAD_LEN];
-    uint16_t aad_len;
-    uint8_t ciphertext[MAX_CIPHERTEXT_LEN];
-    uint16_t ciphertext_len;
-    uint32_t mem_offset;
-} ConfigEntry;
 
-static ConfigEntry entries[MAX_ENTRIES];
-static int num_entries = 0;
 
 uint32_t manual_crc32(const uint8_t *data, size_t len) {
     uint32_t crc = 0xFFFFFFFF;
@@ -246,71 +241,7 @@ uint32_t manual_crc32(const uint8_t *data, size_t len) {
     return crc;
 }
 
-void parse_encrypted_blob(void)
-{
-    const uint8_t *start = ENCRYPTED_BLOB_ADDR;
-    const uint8_t *end = ENCRYPTED_BLOB_ADDR + ENCRYPTED_BLOB_SIZE;
-    const size_t entry_span = ENTRY_SIZE;
-    const size_t max_offset = CRC_LOCATION_OFFSET;
 
-    LOG_INF("Begin blob parsing at address %p, total size: %d", (void *)start, ENCRYPTED_BLOB_SIZE);
-
-    uint32_t computed_crc = manual_crc32(start, ENCRYPTED_BLOB_SIZE - 4);
-    uint32_t stored_crc = *(uint32_t *)(start + CRC_LOCATION_OFFSET);
-    if (computed_crc != stored_crc) {
-        LOG_WRN("CRC mismatch: computed=0x%08X, stored=0x%08X", computed_crc, stored_crc);
-    } else {
-        LOG_INF("CRC check passed: 0x%08X", computed_crc);
-    }
-
-    num_entries = 0;
-
-    for (uintptr_t offset = 0; offset + entry_span <= max_offset && num_entries < MAX_ENTRIES; offset += entry_span) {
-        const uint8_t *ptr = start + offset;
-
-        if (ptr[0] == 0xFF) {
-            continue;
-        }
-
-        ConfigEntry *e = &entries[num_entries];
-        e->mem_offset = offset;
-
-        e->iv_len = *ptr++;
-        if (e->iv_len > MAX_IV_LEN || ptr + e->iv_len > end) {
-            LOG_ERR("Invalid or oversized IV length: %d at entry %d", e->iv_len, num_entries);
-            continue;
-        }
-        memcpy(e->iv, ptr, e->iv_len);
-        ptr += e->iv_len;
-
-        if (ptr + 2 > end) continue;
-        e->aad_len = ptr[0] | (ptr[1] << 8);
-        ptr += 2;
-        if (e->aad_len > MAX_AAD_LEN || ptr + e->aad_len > end) {
-            LOG_ERR("Invalid or oversized AAD length: %d at entry %d", e->aad_len, num_entries);
-            continue;
-        }
-        memcpy(e->aad, ptr, e->aad_len);
-        ptr += e->aad_len;
-
-        if (ptr + 2 > end) continue;
-        e->ciphertext_len = ptr[0] | (ptr[1] << 8);
-        ptr += 2;
-        if (e->ciphertext_len > MAX_CIPHERTEXT_LEN || ptr + e->ciphertext_len > end) {
-            LOG_ERR("Invalid or oversized ciphertext length: %d at entry %d", e->ciphertext_len, num_entries);
-            continue;
-        }
-        memcpy(e->ciphertext, ptr, e->ciphertext_len);
-        ptr += e->ciphertext_len;
-
-        LOG_INF("Parsed entry %d @ offset 0x%04X: IV=%d, AAD=%d, Cipher+Tag=%d",
-                num_entries, (int)offset, e->iv_len, e->aad_len, e->ciphertext_len);
-
-        num_entries++;
-    }
-
-    LOG_INF("Total parsed entries: %d", num_entries);
-}
 
 /* ====================== Shell command impls (with auth touch/guards) ====================== */
 
@@ -414,42 +345,7 @@ int encrypt_config_field_data(const char *plaintext_data, size_t plaintext_len,
     return PROVISIONING_SUCCESS;
 }
 
-void test_decrypt_all_config_entries(void)
-{
-    char decrypted[NRF_CRYPTO_EXAMPLE_AES_MAX_TEXT_SIZE];
-    size_t decrypted_len;
 
-    LOG_INF("Starting config entry decryption test...");
-
-    for (int i = 0; i < num_entries; i++) {
-        const ConfigEntry *e = &entries[i];
-        k_sleep(K_MSEC(100));
-        LOG_INF("Decrypting entry %d: AAD length=%d, Ciphertext length=%d", 
-                i, e->aad_len, e->ciphertext_len);
-
-        int ret = decrypt_config_field_data(
-            (const char *)e->ciphertext, e->ciphertext_len,
-            (const char *)e->iv,
-            (const char *)e->aad, e->aad_len,
-            decrypted, &decrypted_len
-        );
-
-        if (ret != PROVISIONING_SUCCESS) {
-            LOG_ERR("Failed to decrypt entry %d", i);
-            continue;
-        }
-
-        if (decrypted_len < sizeof(decrypted)) {
-            decrypted[decrypted_len] = '\0';
-        } else {
-            decrypted[sizeof(decrypted) - 1] = '\0';
-        }
-
-        LOG_INF("Decrypted entry %d: %s", i, decrypted);
-    }
-
-    LOG_INF("Config entry decryption test complete.");
-}
 
 static int update_crc(void)
 {
@@ -1080,6 +976,75 @@ static int cmd_erase_page(const struct shell *shell, size_t argc, char **argv)
     return err;
 }
 
+
+
+void parse_encrypted_blob(void)
+{
+    const uint8_t *start = ENCRYPTED_BLOB_ADDR;
+    const uint8_t *end = ENCRYPTED_BLOB_ADDR + ENCRYPTED_BLOB_SIZE;
+    const size_t entry_span = ENTRY_SIZE;
+    const size_t max_offset = CRC_LOCATION_OFFSET;
+
+    LOG_INF("Begin blob parsing at address %p, total size: %d", (void *)start, ENCRYPTED_BLOB_SIZE);
+
+    uint32_t computed_crc = manual_crc32(start, ENCRYPTED_BLOB_SIZE - 4);
+    uint32_t stored_crc = *(uint32_t *)(start + CRC_LOCATION_OFFSET);
+    if (computed_crc != stored_crc) {
+        LOG_WRN("CRC mismatch: computed=0x%08X, stored=0x%08X", computed_crc, stored_crc);
+    } else {
+        LOG_INF("CRC check passed: 0x%08X", computed_crc);
+    }
+
+    num_entries = 0;
+
+    for (uintptr_t offset = 0; offset + entry_span <= max_offset && num_entries < MAX_ENTRIES; offset += entry_span) {
+        const uint8_t *ptr = start + offset;
+
+        if (ptr[0] == 0xFF) {
+            continue;
+        }
+
+        ConfigEntry *e = &entries[num_entries];
+        e->mem_offset = offset;
+
+        e->iv_len = *ptr++;
+        if (e->iv_len > MAX_IV_LEN || ptr + e->iv_len > end) {
+            LOG_ERR("Invalid or oversized IV length: %d at entry %d", e->iv_len, num_entries);
+            continue;
+        }
+        memcpy(e->iv, ptr, e->iv_len);
+        ptr += e->iv_len;
+
+        if (ptr + 2 > end) continue;
+        e->aad_len = ptr[0] | (ptr[1] << 8);
+        ptr += 2;
+        if (e->aad_len > MAX_AAD_LEN || ptr + e->aad_len > end) {
+            LOG_ERR("Invalid or oversized AAD length: %d at entry %d", e->aad_len, num_entries);
+            continue;
+        }
+        memcpy(e->aad, ptr, e->aad_len);
+        ptr += e->aad_len;
+
+        if (ptr + 2 > end) continue;
+        e->ciphertext_len = ptr[0] | (ptr[1] << 8);
+        ptr += 2;
+        if (e->ciphertext_len > MAX_CIPHERTEXT_LEN || ptr + e->ciphertext_len > end) {
+            LOG_ERR("Invalid or oversized ciphertext length: %d at entry %d", e->ciphertext_len, num_entries);
+            continue;
+        }
+        memcpy(e->ciphertext, ptr, e->ciphertext_len);
+        ptr += e->ciphertext_len;
+
+        LOG_INF("Parsed entry %d @ offset 0x%04X: IV=%d, AAD=%d, Cipher+Tag=%d",
+                num_entries, (int)offset, e->iv_len, e->aad_len, e->ciphertext_len);
+
+        num_entries++;
+    }
+
+    LOG_INF("Total parsed entries: %d", num_entries);
+}
+
+
 void get_all_config_entries(const struct shell *shell)
 {
     char decrypted[DECRYPTED_OUTPUT_MAX];
@@ -1331,7 +1296,7 @@ static int cmd_cfg_help(const struct shell *shell, size_t argc, char **argv)
         "  erase_entry <aad>             Erase entry by AAD (auth)\n"
         "  erase page <1|2>              Erase page (auth)\n"
         "\nAuth:\n"
-        "  login <password>              Authenticate (default: \"" TEST_PASSWORD "\")\n"
+        "  login <password>              Authenticate \n"
         "  logout                        Re-lock the shell\n"
         "\nNotes:\n"
         "  - Logs are always available.\n"
