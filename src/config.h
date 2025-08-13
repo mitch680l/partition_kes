@@ -138,5 +138,55 @@ typedef struct {
     char cert_tag[64];
 } ota_config_t;
 
+
+typedef struct {
+    char sn[32];
+    char hw_ver[16];
+    char fw_ver[16];   
+    int uas_status;  
+    int power_percent; 
+} hardware_info_t;
+
+typedef struct {
+    char make[32];   
+    char model[32]; 
+    char fw_ver[16];   
+    char topic[64];     
+    char imei[20];    
+    char sim[32];    
+    char esim[32];      
+    uint16_t lte_bandmask;
+} modem_info_t;
+
+typedef struct {
+    char msg_format[16];
+    char gps_format[16];
+    char units[16];
+    int sampling_rate;
+    int filter_window;
+    bool auto_calibrate;
+} sensor_config_t;
+
+typedef struct {
+    int update_rate;
+    char version[32];
+    uint8_t constellation_mask;
+    int accuracy_threshold;
+} gnss_config_t;
+
+typedef struct {
+    char uas_num[32];
+    char description[64];
+    char field1[64];
+    char field2[64];
+    char field3[64];
+    char field4[64];
+} customer_info_t;
+
 extern mqtt_config_t *mqtt_config;
 extern ota_config_t *ota_config;
+extern hardware_info_t *hw_info;
+extern modem_info_t *modem_info;
+extern sensor_config_t *sensor_config;
+extern gnss_config_t *gnss_config;
+extern customer_info_t *customer_info;
