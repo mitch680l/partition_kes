@@ -34,12 +34,13 @@ ota_config_t *ota_config = NULL;
 void parse_system_enable_config(void) {
     memset(&sys_enable_config, 0, sizeof(sys_enable_config));
 
-    const char *raw = get_config("SYS_EN");
-    if (!raw || strncmp(raw, "H:SYS_EN,", 9) != 0) {
+    const char *raw = get_config("sys_en");
+    if (!raw) {
         return;
     }
 
-    uint16_t bitmask = (uint16_t)strtol(raw + 9, NULL, 0);
+    // Parse hex string like "0x01FF"
+    uint16_t bitmask = (uint16_t)strtol(raw, NULL, 0);
 
     sys_enable_config.lte_en        = bitmask & SYS_EN_LTE_EN;
     sys_enable_config.irid_en       = bitmask & SYS_EN_IRID_EN;
