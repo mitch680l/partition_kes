@@ -149,8 +149,7 @@ typedef struct {
 typedef struct {
     char make[32];   
     char model[32]; 
-    char fw_ver[16];   
-    char topic[64];     
+    char fw_ver[16];    
     char imei[20];    
     char sim[32];    
     char esim[32];      

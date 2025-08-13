@@ -62,8 +62,8 @@ void parse_modem_info(modem_info_t *cfg) {
 
     val = get_config("mdm_info");
     if (val) {
-        sscanf(val, "%31[^,],%31[^,],%15[^,],%63[^,]", 
-               cfg->make, cfg->model, cfg->fw_ver, cfg->topic);
+        sscanf(val, "%31[^,],%31[^,],%20[^,]", 
+               cfg->make, cfg->model, cfg->fw_ver);
     }
 
     val = get_config("mdm_imei");
@@ -312,7 +312,6 @@ void print_modem_info(void) {
     printf("Make:                 %s\n", modem_info->make);
     printf("Model:                %s\n", modem_info->model);
     printf("FW Version:           %s\n", modem_info->fw_ver);
-    printf("Topic:                %s\n", modem_info->topic);
     printf("IMEI:                 %s\n", modem_info->imei);
     printf("SIM Provider:         %s\n", modem_info->sim);
     printf("eSIM Provider:        %s\n", modem_info->esim);
