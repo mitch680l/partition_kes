@@ -14,15 +14,12 @@
 
 psa_key_id_t my_key_id = 0x00000005;
 psa_key_handle_t my_key_handle;
-#define PBKDF2_ITERATIONS 64000u
+
 
 LOG_MODULE_REGISTER(aes_gcm, LOG_LEVEL_DBG);
 
 
-#define MAX_TRIES        3
-#define LOCKOUT_MS       30000     
-#define AUTO_LOGOUT_MS   60000      
-#define TEST_PASSWORD    "Password" 
+
 #define PRINT_HEX(label, buf, len)                                      \
     do {                                                                 \
         LOG_INF("---- %s (len: %zu) ----", (label), (size_t)(len));      \
@@ -30,10 +27,13 @@ LOG_MODULE_REGISTER(aes_gcm, LOG_LEVEL_DBG);
         LOG_INF("---- %s end ----", (label));                            \
     } while (0)
 /* --- state --- */
-static uint8_t  s_fail_count;
-static int64_t  s_lock_until_ms;    
-static int64_t  s_last_activity_ms; 
-static bool     s_authed;
+
+uint8_t  s_fail_count;
+
+int64_t  s_lock_until_ms;    
+
+int64_t  s_last_activity_ms; 
+bool     s_authed;
 
 static inline int consttime_cmp(const uint8_t *a, const uint8_t *b, size_t len) {
     uint8_t diff = 0;
@@ -175,6 +175,7 @@ static int cmd_login(const struct shell *sh, size_t argc, char **argv)
 static int cmd_logout(const struct shell *sh, size_t argc, char **argv)
 {
     ARG_UNUSED(argc); ARG_UNUSED(argv);
+    REQUIRE_AUTH(sh);
     set_locked_state(sh);
     shell_print(sh, "Logged out.");
     return 0;
@@ -317,6 +318,7 @@ static int cmd_parse_blob(const struct shell *shell, size_t argc, char **argv)
 {
     ARG_UNUSED(argc); ARG_UNUSED(argv);
     AUTH_TOUCH();
+    REQUIRE_AUTH(shell);
 
     shell_print(shell, "Parsing encrypted blob...");
     parse_encrypted_blob();
@@ -595,6 +597,9 @@ static int erase_entry_by_aad(const char *aad)
 }
 static int cmd_erase_entry(const struct shell *shell, size_t argc, char **argv)
 {
+    AUTH_TOUCH();
+    REQUIRE_AUTH(shell);
+
     if (argc != 2) {
         shell_print(shell, "Usage: erase_entry <aad>");
         return -EINVAL;
@@ -752,6 +757,7 @@ const char *get_config(const char *aad)
 static int cmd_get_config(const struct shell *shell, size_t argc, char **argv)
 {
     AUTH_TOUCH();
+    REQUIRE_AUTH(shell);
 
     if (argc != 2) {
         shell_error(shell, "Usage: cfg get_config <aad>");
@@ -923,6 +929,7 @@ static int cmd_set_entry(const struct shell *shell, size_t argc, char **argv)
 static int cmd_get_entry_hex(const struct shell *shell, size_t argc, char **argv)
 {
     AUTH_TOUCH();
+    REQUIRE_AUTH(shell);
 
     if (argc != 2) {
         shell_error(shell, "Usage: cfg get_hex <index>");
@@ -950,6 +957,7 @@ static int cmd_get_entry_hex(const struct shell *shell, size_t argc, char **argv
 static int cmd_get_page_hex(const struct shell *shell, size_t argc, char **argv)
 {
     AUTH_TOUCH();
+    REQUIRE_AUTH(shell);
 
     if (argc != 2) {
         shell_error(shell, "Usage: cfg get_page_hex <page_index:1-2>");
@@ -977,6 +985,7 @@ static int cmd_get_page_hex(const struct shell *shell, size_t argc, char **argv)
 static int cmd_get_blob_hex(const struct shell *shell, size_t argc, char **argv)
 {
     AUTH_TOUCH();
+    REQUIRE_AUTH(shell);
 
     shell_print(shell, "Full blob (size: %d, CRC at offset 0x%x):", ENCRYPTED_BLOB_SIZE, CRC_LOCATION_OFFSET);
     for (int i = 0; i < ENCRYPTED_BLOB_SIZE; i++) {
@@ -992,6 +1001,7 @@ static int cmd_get_blob_hex(const struct shell *shell, size_t argc, char **argv)
 static int cmd_get_crc_info(const struct shell *shell, size_t argc, char **argv)
 {
     AUTH_TOUCH();
+    REQUIRE_AUTH(shell);
 
     uint32_t computed_crc = manual_crc32(ENCRYPTED_BLOB_ADDR, ENCRYPTED_BLOB_SIZE - 4);
     uint32_t stored_crc = *(uint32_t *)(ENCRYPTED_BLOB_ADDR + CRC_LOCATION_OFFSET);
@@ -1008,6 +1018,7 @@ static int cmd_get_crc_info(const struct shell *shell, size_t argc, char **argv)
 static int cmd_show_layout(const struct shell *shell, size_t argc, char **argv)
 {
     AUTH_TOUCH();
+    REQUIRE_AUTH(shell);
 
     shell_print(shell, "Encrypted Blob Layout:");
     shell_print(shell, "  Base Address:     0x%x", (unsigned int)ENCRYPTED_BLOB_ADDR);
@@ -1098,6 +1109,7 @@ static int cmd_get_all(const struct shell *shell, size_t argc, char **argv)
 {
     ARG_UNUSED(argc); ARG_UNUSED(argv);
     AUTH_TOUCH();
+    REQUIRE_AUTH(shell);
     
     shell_print(shell, "All configuration entries:");
     get_all_config_entries(shell);
@@ -1244,6 +1256,8 @@ static int cmd_rebuild_blob(const struct shell *shell, size_t argc, char **argv)
 {
     ARG_UNUSED(argc);
     ARG_UNUSED(argv);
+    AUTH_TOUCH();
+    REQUIRE_AUTH(shell);
 
     shell_print(shell, "Rebuilding blob from entries[] (compacted layout)...");
     int rc = rebuild_blob_compact_from_entries_stack();
@@ -1297,6 +1311,9 @@ SHELL_CMD_REGISTER(logout, NULL, "Logout and re-lock the shell",     cmd_logout)
 static int cmd_cfg_help(const struct shell *shell, size_t argc, char **argv)
 {
     ARG_UNUSED(argc); ARG_UNUSED(argv);
+    AUTH_TOUCH();
+    REQUIRE_AUTH(shell);
+    
     shell_print(shell,
         "cfg commands:\n"
         "  parse                         Parse encrypted blob into RAM index\n"
@@ -1329,3 +1346,191 @@ static int cmd_cfg_help(const struct shell *shell, size_t argc, char **argv)
 
 
 
+
+/*
+ * Backup shell: copy 8KB encrypted blob between two slots.
+ *
+ * Requires two flash partitions/areas:
+ *   - encrypted_blob_slot0  (e.g. address 0x000FB000, size 0x2000)
+ *   - encrypted_blob_slot1  (e.g. address 0x000FE000, size 0x2000)
+ *
+ * Example usage:
+ *   uart:~$ backup copyinto 0 1    # copy slot0 -> slot1
+ */
+
+
+
+/* Slot constants per your description */
+#define BLOB_SLOT_SIZE_BYTES   (8 * 1024)    /* 8 KB total per slot */
+#define ERASE_STEP_BYTES       (4 * 1024)    /* driver erases 4 KB at a time */
+
+/* Read/Write buffer chunk. Keep modest to fit small stacks. */
+#define COPY_CHUNK_BYTES       256
+
+
+static int slot_to_area_id(int slot, uint8_t *out_area_id)
+{
+    if (slot == 0) {
+        *out_area_id = FLASH_AREA_ID(encrypted_blob_slot0);
+        return 0;
+    } else if (slot == 1) {
+        *out_area_id = FLASH_AREA_ID(encrypted_blob_slot1);
+        return 0;
+    }
+    return -EINVAL;
+}
+
+static int erase_slot(const struct flash_area *fa)
+{
+    /* Erase exactly 8KB in 4KB steps from offset 0 */
+    for (size_t off = 0; off < BLOB_SLOT_SIZE_BYTES; off += ERASE_STEP_BYTES) {
+        int err = flash_area_erase(fa, off, ERASE_STEP_BYTES);
+        if (err) {
+            LOG_ERR("Erase failed at off=0x%zx err=%d", off, err);
+            return err;
+        }
+    }
+    return 0;
+}
+
+static int copy_slot(int src_slot, int dst_slot)
+{
+    if (src_slot == dst_slot) {
+        LOG_ERR("Source and destination slots are identical");
+        return -EINVAL;
+    }
+
+    uint8_t src_id, dst_id;
+    int err = slot_to_area_id(src_slot, &src_id);
+    if (err) {
+        LOG_ERR("Invalid src slot %d", src_slot);
+        return err;
+    }
+    err = slot_to_area_id(dst_slot, &dst_id);
+    if (err) {
+        LOG_ERR("Invalid dst slot %d", dst_slot);
+        return err;
+    }
+
+    const struct flash_area *src_fa = NULL, *dst_fa = NULL;
+    err = flash_area_open(src_id, &src_fa);
+    if (err) {
+        LOG_ERR("flash_area_open(src) failed: %d", err);
+        return err;
+    }
+    err = flash_area_open(dst_id, &dst_fa);
+    if (err) {
+        LOG_ERR("flash_area_open(dst) failed: %d", err);
+        flash_area_close(src_fa);
+        return err;
+    }
+
+   
+
+    /* Erase destination slot */
+    err = erase_slot(dst_fa);
+    if (err) {
+        goto out_close;
+    }
+
+    /* Copy in small chunks */
+    uint8_t buf[COPY_CHUNK_BYTES];
+    for (size_t off = 0; off < BLOB_SLOT_SIZE_BYTES; off += COPY_CHUNK_BYTES) {
+        size_t chunk = MIN(COPY_CHUNK_BYTES, BLOB_SLOT_SIZE_BYTES - off);
+
+        err = flash_area_read(src_fa, off, buf, chunk);
+        if (err) {
+            LOG_ERR("Read src failed off=0x%zx err=%d", off, err);
+            goto out_close;
+        }
+
+        err = flash_area_write(dst_fa, off, buf, chunk);
+        if (err) {
+            LOG_ERR("Write dst failed off=0x%zx err=%d", off, err);
+            goto out_close;
+        }
+    }
+
+    /* Verify write */
+    for (size_t off = 0; off < BLOB_SLOT_SIZE_BYTES; off += COPY_CHUNK_BYTES) {
+        size_t chunk = MIN(COPY_CHUNK_BYTES, BLOB_SLOT_SIZE_BYTES - off);
+
+        uint8_t src_chk[COPY_CHUNK_BYTES];
+        uint8_t dst_chk[COPY_CHUNK_BYTES];
+
+        err = flash_area_read(src_fa, off, src_chk, chunk);
+        if (err) {
+            LOG_ERR("Verify read src failed off=0x%zx err=%d", off, err);
+            goto out_close;
+        }
+        err = flash_area_read(dst_fa, off, dst_chk, chunk);
+        if (err) {
+            LOG_ERR("Verify read dst failed off=0x%zx err=%d", off, err);
+            goto out_close;
+        }
+        if (memcmp(src_chk, dst_chk, chunk) != 0) {
+            LOG_ERR("Verify mismatch at off=0x%zx", off);
+            err = -EIO;
+            goto out_close;
+        }
+    }
+
+    /* If your system requires recalculating a CRC after any change, do it. */
+    err = update_crc();
+    if (err) {
+        LOG_WRN("update_crc() returned %d", err);
+        /* not fatal for the copy itself */
+        err = 0;
+    }
+
+    LOG_INF("Copied slot %d -> slot %d (8KB)", src_slot, dst_slot);
+
+out_close:
+    flash_area_close(dst_fa);
+    flash_area_close(src_fa);
+    return err;
+}
+
+/* ===== Shell glue ===== */
+
+static int cmd_backup_copyinto(const struct shell *sh, size_t argc, char **argv)
+{
+    ARG_UNUSED(sh);
+
+    if (argc != 3) {
+        shell_error(sh, "Usage: backup copyinto <src:0|1> <dst:0|1>");
+        return -EINVAL;
+    }
+
+    char *endp = NULL;
+    long src = strtol(argv[1], &endp, 10);
+    if (*argv[1] == '\0' || *endp != '\0') {
+        shell_error(sh, "Invalid src '%s'", argv[1]);
+        return -EINVAL;
+    }
+    endp = NULL;
+    long dst = strtol(argv[2], &endp, 10);
+    if (*argv[2] == '\0' || *endp != '\0') {
+        shell_error(sh, "Invalid dst '%s'", argv[2]);
+        return -EINVAL;
+    }
+
+    int err = copy_slot((int)src, (int)dst);
+    if (err) {
+        shell_error(sh, "Copy failed: %d", err);
+        return err;
+    }
+
+    shell_print(sh, "OK: slot %ld -> slot %ld", src, dst);
+    return 0;
+}
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_backup,
+    SHELL_CMD_ARG(copyinto, NULL,
+                  "copyinto <src:0|1> <dst:0|1>\n"
+                  "Copy 8KB from encrypted blob slot <src> into <dst>.",
+                  cmd_backup_copyinto, 3, 0),
+    SHELL_SUBCMD_SET_END /* Array terminator */
+);
+
+SHELL_CMD_REGISTER(backup, &sub_backup, "Encrypted blob backup utilities", NULL);

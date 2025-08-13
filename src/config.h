@@ -26,6 +26,7 @@
 #define CONFIG_PAGE_COUNT 2  
 #define TOTAL_ENTRIES     (CONFIG_PAGE_COUNT * ENTRIES_PER_PAGE) 
 #define ENCRYPTED_BLOB_ADDR ((const uint8_t *)0xfb000)
+#define ENCRYPTED_BLOB_ADDR_2 ((const uint8_t *)0xfe000)
 #define ENCRYPTED_BLOB_SIZE 8192 
 #define FLASH_CRC_PAGE_OFFSET (CONFIG_PAGE_COUNT * FLASH_PAGE_SIZE)
 #define FLASH_PAGE_CRC_SIZE  (ENCRYPTED_BLOB_SIZE - FLASH_CRC_PAGE_OFFSET)
@@ -51,8 +52,21 @@
 #define AES_KEY_SIZE (32) 
 #define DECRYPTED_OUTPUT_MAX 256
 
+#define DEFAULT_BROKER_HOST "18.234.99.151"
+#define DEFAULT_FOTA_HOST "18.234.99.151"
+#define DEFAULT_MQTT_BROKER_PORT 8883
+#define DEFAULT_INTERVAL_MQTT 100
+#define DEFAULT_FOTA_INTERVAL_MS (1000 * 60 * 1000)
+#define DEFAULT_ENABLE_IRIDIUM false
+#define DEFAULT_GPS_TARGET_RATE 25
 
 
+#define MAX_TRIES        3
+#define LOCKOUT_MS       30000     
+#define AUTO_LOGOUT_MS   60000      
+#define TEST_PASSWORD    "Password" 
+#define MAX_BLOB (8 * 1024) 
+#define PBKDF2_ITERATIONS 64000u
 extern char mqtt_client_id[MQTT_MAX_STR_LEN];               
 extern int  mqtt_broker_port;
 extern int interval_mqtt;
@@ -60,10 +74,13 @@ extern int fota_interval_ms;
 extern int gps_target_rate;
 extern char firmware_filename[MQTT_MAX_STR_LEN];
 extern char json_payload[512];
+extern char sensor_payload[512];
+extern char topic_gps[64];
+extern char topic_sensor[64];
+extern char topic_lte[64];
 
-
-extern const char *mqtt_broker_host;
-extern const char *fota_host; 
+extern char mqtt_broker_host[MQTT_MAX_STR_LEN];
+extern char fota_host[MQTT_MAX_STR_LEN];
 extern struct mqtt_utf8 struct_pass;
 extern struct mqtt_utf8 struct_user;
 

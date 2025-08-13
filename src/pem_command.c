@@ -11,19 +11,19 @@
 #include <nrf_modem_at.h>
 #include <dk_buttons_and_leds.h>
 #include <modem/modem_key_mgmt.h>
-
 #include "shell_commands.h"
 #include "config.h"
-
+#include "fota.h"
 #include <zephyr/shell/shell.h>
 
-
+#define MAX_BLOB 8192
 
 /* Consistent, exact prototypes used by SHELL_CMD_ARG */
 static int cmd_keymgmt_put(const struct shell *sh, size_t argc, char **argv);
 static int cmd_keymgmt_status(const struct shell *sh, size_t argc, char **argv);
 static int cmd_keymgmt_abort(const struct shell *sh, size_t argc, char **argv);
 static int cmd_keymgmt_print(const struct shell *sh, size_t argc, char **argv);
+static int cmd_keymgmt_delete(const struct shell *sh, size_t argc, char **argv);
 /* ... helpers, globals, etc ... */
 
 /* Subcommand table (file scope, not inside any function) */
@@ -40,15 +40,13 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_keymgmt,
     SHELL_CMD_ARG(print,  NULL,
         "Print current buffer contents with proper line breaks",
         cmd_keymgmt_print,  1, 0),
+    SHELL_CMD_ARG(delete, NULL,
+        "Delete credential: keymgmt delete <sec_tag> <ca|cert|key>",
+        cmd_keymgmt_delete, 3, 0),
     SHELL_SUBCMD_SET_END
 );
 
 SHELL_CMD_REGISTER(keymgmt, &sub_keymgmt, "Modem key mgmt over PEM lines", NULL);
-
-/* … definitions of cmd_put/cmd_status/cmd_abort below … */
-
-
-#define MAX_BLOB (8 * 1024)  // Reduced to 8KB - adjust as needed
 
 K_MUTEX_DEFINE(g_lock);
 
@@ -133,9 +131,11 @@ static char *trim_eol(char *s)
 }
 
 /* keymgmt put <sec_tag> <ca|cert|key> <one_line> */
-
 static int cmd_keymgmt_put(const struct shell *sh, size_t argc, char **argv)
 {
+	AUTH_TOUCH();
+	REQUIRE_AUTH(sh);
+
 	if (argc < 4) {
 		shell_error(sh, "Usage: keymgmt put <sec_tag> <ca|cert|key> <one_line>");
 		return -EINVAL;
@@ -213,6 +213,8 @@ static int cmd_keymgmt_put(const struct shell *sh, size_t argc, char **argv)
 static int cmd_keymgmt_status(const struct shell *sh, size_t argc, char **argv)
 {
 	ARG_UNUSED(argc); ARG_UNUSED(argv);
+	AUTH_TOUCH();
+	REQUIRE_AUTH(sh);
 	k_mutex_lock(&g_lock, K_FOREVER);
 	if (!g_active) {
 		shell_print(sh, "IDLE");
@@ -228,6 +230,8 @@ static int cmd_keymgmt_status(const struct shell *sh, size_t argc, char **argv)
 static int cmd_keymgmt_abort(const struct shell *sh, size_t argc, char **argv)
 {
 	ARG_UNUSED(argc); ARG_UNUSED(argv);
+	AUTH_TOUCH();
+	REQUIRE_AUTH(sh);
 	k_mutex_lock(&g_lock, K_FOREVER);
 	if (!g_active) {
 		shell_print(sh, "No active session");
@@ -243,6 +247,8 @@ static int cmd_keymgmt_abort(const struct shell *sh, size_t argc, char **argv)
 static int cmd_keymgmt_print(const struct shell *sh, size_t argc, char **argv)
 {
 	ARG_UNUSED(argc); ARG_UNUSED(argv);
+	AUTH_TOUCH();
+	REQUIRE_AUTH(sh);
 	
 	k_mutex_lock(&g_lock, K_FOREVER);
 	if (!g_active) {
@@ -304,4 +310,46 @@ static int cmd_keymgmt_print(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "=== End of buffer (%u lines printed) ===", (unsigned)line_count);
 	k_mutex_unlock(&g_lock);
 	return 0;
+}
+
+/* keymgmt delete <sec_tag> <ca|cert|key> */
+static int cmd_keymgmt_delete(const struct shell *sh, size_t argc, char **argv)
+{
+	AUTH_TOUCH();
+	REQUIRE_AUTH(sh);
+
+	if (argc < 3) {
+		shell_error(sh, "Usage: keymgmt delete <sec_tag> <ca|cert|key>");
+		return -EINVAL;
+	}
+
+	sec_tag_t tag = (sec_tag_t)strtol(argv[1], NULL, 10);
+	enum modem_key_mgmt_cred_type type;
+	
+	if (!map_type(argv[2], &type)) {
+		shell_error(sh, "Unknown type: %s (use: ca|cert|key)", argv[2]);
+		return -EINVAL;
+	}
+
+	/* Check if we're trying to delete something that's currently being buffered */
+	k_mutex_lock(&g_lock, K_FOREVER);
+	if (g_active && g_tag == tag && g_type == type) {
+		shell_warn(sh, "Warning: Clearing active buffer for tag=%d type=%s", 
+		           g_tag, type_to_str(g_type));
+		session_reset();
+	}
+	k_mutex_unlock(&g_lock);
+
+	/* Attempt to delete the credential */
+	int ret = modem_key_mgmt_delete(tag, type);
+	if (ret == 0) {
+		shell_print(sh, "OK deleted tag=%d type=%s", tag, type_to_str(type));
+	} else if (ret == -ENOENT) {
+		shell_warn(sh, "Credential not found: tag=%d type=%s", tag, type_to_str(type));
+	} else {
+		shell_error(sh, "Failed to delete tag=%d type=%s (err %d)", 
+		            tag, type_to_str(type), ret);
+	}
+
+	return ret;
 }

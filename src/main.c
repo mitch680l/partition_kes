@@ -217,8 +217,8 @@ int main(void)
         provision_all();
         printk("Provisioning finished.\n");
 		k_sleep(K_MSEC(1000));
-		//parse_encrypted_blob();
-
+		parse_encrypted_blob();
+        config_init();
 		
 
 		printf("Parsed %d config entries\n", num_entries);
