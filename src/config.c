@@ -28,10 +28,13 @@ struct mqtt_utf8 struct_pass;
 struct mqtt_utf8 struct_user;
 system_enable_t sys_enable_config;
 
-mqtt_config_t *mqtt_config = NULL;
-ota_config_t *ota_config = NULL;
-hardware_info_t *hw_info = NULL;
-modem_info_t *modem_info = NULL;
+mqtt_config_t     *mqtt_config     = NULL;
+ota_config_t      *ota_config      = NULL;
+hardware_info_t   *hw_info         = NULL;
+modem_info_t      *modem_info      = NULL;
+sensor_config_t   *sensor_config   = NULL;
+gnss_config_t     *gnss_config     = NULL;
+customer_info_t   *customer_info   = NULL;
 
 void parse_hardware_info(hardware_info_t *cfg) {
     const char *val;
@@ -283,6 +286,35 @@ void print_gnss_config(void) {
     printf("Module Version:       %s\n", gnss_config->version);
     printf("Constellation Mask:   0x%02X\n", gnss_config->constellation_mask);
     printf("Accuracy Threshold:   %d meters\n", gnss_config->accuracy_threshold);
+}
+void print_hardware_info(void) {
+    if (!hw_info) {
+        printf("Hardware info not initialized.\n");
+        return;
+    }
+
+    printf("=== Hardware Information ===\n");
+    printf("Serial Number:        %s\n", hw_info->sn);
+    printf("HW Version:           %s\n", hw_info->hw_ver);
+    printf("FW Version:           %s\n", hw_info->fw_ver);
+    printf("UAS Status:           %d\n", hw_info->uas_status);
+    printf("Power Status:         %d%%\n", hw_info->power_percent);
+}
+void print_modem_info(void) {
+    if (!modem_info) {
+        printf("Modem info not initialized.\n");
+        return;
+    }
+
+    printf("=== Modem Information ===\n");
+    printf("Make:                 %s\n", modem_info->make);
+    printf("Model:                %s\n", modem_info->model);
+    printf("FW Version:           %s\n", modem_info->fw_ver);
+    printf("Topic:                %s\n", modem_info->topic);
+    printf("IMEI:                 %s\n", modem_info->imei);
+    printf("SIM Provider:         %s\n", modem_info->sim);
+    printf("eSIM Provider:        %s\n", modem_info->esim);
+    printf("LTE Bandmask:         0x%04X\n", modem_info->lte_bandmask);
 }
 
 void print_customer_info(void) {
