@@ -35,26 +35,32 @@ modem_info_t      *modem_info      = NULL;
 sensor_config_t   *sensor_config   = NULL;
 gnss_config_t     *gnss_config     = NULL;
 customer_info_t   *customer_info   = NULL;
+message_settings_t *msg_settings = NULL;
 
 void parse_hardware_info(hardware_info_t *cfg) {
     const char *val;
 
-    val = get_config("hw_info");  // Format: ABC123456,1.2.3,2.1.0,1
+    cfg->sn[0] = cfg->hw_ver[0] = cfg->fw_ver[0] = '\0';
+    cfg->power_enabled = false;
+
+
+    val = get_config("hw_info");
     if (val) {
-        sscanf(val, "%31[^,],%15[^,],%15[^,],%d", 
-               cfg->sn, cfg->hw_ver, cfg->fw_ver, &cfg->uas_status);
+
+        sscanf(val, "%31[^,],%15[^,],%15[^,]",
+               cfg->sn, cfg->hw_ver, cfg->fw_ver);
     }
 
     val = get_config("pwr_st");
     if (val) {
-        cfg->power_percent = atoi(val);
+        cfg->power_enabled = atoi(val) ? true : false;
     }
 }
 
 void parse_modem_info(modem_info_t *cfg) {
     const char *val;
 
-    val = get_config("mdm_info");  // Format: Quectel,QC789,1.4.2,status
+    val = get_config("mdm_info");
     if (val) {
         sscanf(val, "%31[^,],%31[^,],%15[^,],%63[^,]", 
                cfg->make, cfg->model, cfg->fw_ver, cfg->topic);
@@ -63,7 +69,7 @@ void parse_modem_info(modem_info_t *cfg) {
     val = get_config("mdm_imei");
     if (val) strncpy(cfg->imei, val, sizeof(cfg->imei) - 1);
 
-    val = get_config("sim_info");  // Format: Verizon,AT&T
+    val = get_config("sim_info"); 
     if (val) {
         sscanf(val, "%31[^,],%31[^,]", cfg->sim, cfg->esim);
     }
@@ -83,7 +89,6 @@ void parse_system_enable_config(void) {
         return;
     }
 
-    // Parse hex string like "0x01FF"
     uint16_t bitmask = (uint16_t)strtol(raw, NULL, 0);
 
     sys_enable_config.lte_en        = bitmask & SYS_EN_LTE_EN;
@@ -142,18 +147,6 @@ void parse_ota_config(ota_config_t *cfg) {
 void parse_sensor_config(sensor_config_t *cfg) {
     const char *val;
 
-    val = get_config("msg_fmt");
-    if (val) strncpy(cfg->msg_format, val, sizeof(cfg->msg_format) - 1);
-    else strncpy(cfg->msg_format, "JSON", sizeof(cfg->msg_format));
-
-    val = get_config("gps_fmt");
-    if (val) strncpy(cfg->gps_format, val, sizeof(cfg->gps_format) - 1);
-    else strncpy(cfg->gps_format, "NMEA", sizeof(cfg->gps_format));
-
-    val = get_config("units");
-    if (val) strncpy(cfg->units, val, sizeof(cfg->units) - 1);
-    else strncpy(cfg->units, "METRIC", sizeof(cfg->units));
-
     val = get_config("sens_rt");
     if (val) cfg->sampling_rate = atoi(val);
     else cfg->sampling_rate = 10;
@@ -196,8 +189,8 @@ void parse_customer_info(customer_info_t *cfg) {
     val = get_config("cust_desc");
     if (val) strncpy(cfg->description, val, sizeof(cfg->description) - 1);
 
-    val = get_config("cust_f1");
-    if (val) strncpy(cfg->field1, val, sizeof(cfg->field1) - 1);
+    val = get_config("uas_status");
+    if (val) strncpy(cfg->uas_status, val, sizeof(cfg->uas_status) - 1);
 
     val = get_config("cust_f2");
     if (val) strncpy(cfg->field2, val, sizeof(cfg->field2) - 1);
@@ -209,6 +202,18 @@ void parse_customer_info(customer_info_t *cfg) {
     if (val) strncpy(cfg->field4, val, sizeof(cfg->field4) - 1);
 }
 
+void parse_message_settings(message_settings_t *cfg) {
+    const char *v;
+
+    // Defaults first (optional but recommended)
+    strncpy(cfg->msg_format, "JSON", sizeof(cfg->msg_format)-1);
+    strncpy(cfg->gps_format, "NMEA", sizeof(cfg->gps_format)-1);
+    strncpy(cfg->units,      "METRIC", sizeof(cfg->units)-1);
+
+    v = get_config("msg_fmt"); if (v) { cfg->msg_format[0] = '\0'; strncat(cfg->msg_format, v, sizeof(cfg->msg_format)-1); }
+    v = get_config("gps_fmt"); if (v) { cfg->gps_format[0] = '\0'; strncat(cfg->gps_format, v, sizeof(cfg->gps_format)-1); }
+    v = get_config("units");   if (v) { cfg->units[0]      = '\0'; strncat(cfg->units,      v, sizeof(cfg->units)-1); }
+}
 
 void print_ota_config(void) {
     if (!ota_config) {
@@ -267,9 +272,6 @@ void print_sensor_config(void) {
     }
 
     printf("=== Sensor Configuration ===\n");
-    printf("Message Format:       %s\n", sensor_config->msg_format);
-    printf("GPS Format:           %s\n", sensor_config->gps_format);
-    printf("Units:                %s\n", sensor_config->units);
     printf("Sampling Rate (Hz):   %d\n", sensor_config->sampling_rate);
     printf("Filter Window Size:   %d\n", sensor_config->filter_window);
     printf("Auto Calibration:     %s\n", sensor_config->auto_calibrate ? "Enabled" : "Disabled");
@@ -297,9 +299,9 @@ void print_hardware_info(void) {
     printf("Serial Number:        %s\n", hw_info->sn);
     printf("HW Version:           %s\n", hw_info->hw_ver);
     printf("FW Version:           %s\n", hw_info->fw_ver);
-    printf("UAS Status:           %d\n", hw_info->uas_status);
-    printf("Power Status:         %d%%\n", hw_info->power_percent);
+    printf("Power Status Enable:  %s\n", hw_info->power_enabled ? "Enabled" : "Disabled");
 }
+
 void print_modem_info(void) {
     if (!modem_info) {
         printf("Modem info not initialized.\n");
@@ -326,10 +328,22 @@ void print_customer_info(void) {
     printf("=== Customer Information ===\n");
     printf("UAS Number:           %s\n", customer_info->uas_num);
     printf("Description:          %s\n", customer_info->description);
-    printf("Custom Field 1:       %s\n", customer_info->field1);
+    printf("UAS STATUS:       %s\n", customer_info->uas_status);
     printf("Custom Field 2:       %s\n", customer_info->field2);
     printf("Custom Field 3:       %s\n", customer_info->field3);
     printf("Custom Field 4:       %s\n", customer_info->field4);
+}
+
+void print_message_settings(void) {
+    if (!msg_settings) {
+        printf("Message settings not initialized.\n");
+        return;
+    }
+
+    printf("=== Message Settings ===\n");
+    printf("Message Format:       %s\n", msg_settings->msg_format);
+    printf("GPS Format:           %s\n", msg_settings->gps_format);
+    printf("Units:                %s\n", msg_settings->units);
 }
 
 void print_all_configs(void) {
@@ -341,7 +355,13 @@ void print_all_configs(void) {
     print_mqtt_config();
     print_ota_config();
     print_customer_info();
+    print_message_settings();
 }
+
+
+
+
+
 
 void config_init(void) {
     parse_system_enable_config();
@@ -400,6 +420,12 @@ void config_init(void) {
     if (customer_info) {
         memset(customer_info, 0, sizeof(*customer_info));
         parse_customer_info(customer_info);
+    }
+
+    msg_settings = malloc(sizeof(*msg_settings));
+    if (msg_settings) {
+        memset(msg_settings, 0, sizeof(*msg_settings));
+        parse_message_settings(msg_settings);
     }
 
     if (sys_enable_config.debug_mode) {

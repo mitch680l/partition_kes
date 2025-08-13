@@ -141,10 +141,9 @@ typedef struct {
 
 typedef struct {
     char sn[32];
-    char hw_ver[16];
+    char hw_ver[16];    
     char fw_ver[16];   
-    int uas_status;  
-    int power_percent; 
+    bool power_enabled; 
 } hardware_info_t;
 
 typedef struct {
@@ -159,12 +158,9 @@ typedef struct {
 } modem_info_t;
 
 typedef struct {
-    char msg_format[16];
-    char gps_format[16];
-    char units[16];
-    int sampling_rate;
-    int filter_window;
-    bool auto_calibrate;
+    int  sampling_rate;     
+    int  filter_window;     
+    bool auto_calibrate;  
 } sensor_config_t;
 
 typedef struct {
@@ -177,11 +173,17 @@ typedef struct {
 typedef struct {
     char uas_num[32];
     char description[64];
-    char field1[64];
+    char uas_status[64];
     char field2[64];
     char field3[64];
     char field4[64];
 } customer_info_t;
+
+typedef struct {
+    char msg_format[16];  
+    char gps_format[16];   
+    char units[16];       
+} message_settings_t;
 
 extern mqtt_config_t *mqtt_config;
 extern ota_config_t *ota_config;
@@ -190,3 +192,4 @@ extern modem_info_t *modem_info;
 extern sensor_config_t *sensor_config;
 extern gnss_config_t *gnss_config;
 extern customer_info_t *customer_info;
+extern message_settings_t *message_settings;
