@@ -130,9 +130,26 @@ void print_mqtt_config(void) {
     printf("QoS:           %d\n", mqtt_config->qos);
 }
 
+void print_system_enable(void) {
+    printf("=== System Enable Flags ===\n");
+    printf("LTE Enabled:         %s\n", sys_enable_config.lte_en        ? "Yes" : "No");
+    printf("Iridium Enabled:     %s\n", sys_enable_config.irid_en       ? "Yes" : "No");
+    printf("Power Save Mode:     %s\n", sys_enable_config.psm_en        ? "Yes" : "No");
+    printf("HW Info Reporting:   %s\n", sys_enable_config.hw_en         ? "Yes" : "No");
+    printf("Modem Info:          %s\n", sys_enable_config.mdm_en        ? "Yes" : "No");
+    printf("GNSS Enabled:        %s\n", sys_enable_config.gnss_en       ? "Yes" : "No");
+    printf("IMU Enabled:         %s\n", sys_enable_config.imu_en        ? "Yes" : "No");
+    printf("Compass Enabled:     %s\n", sys_enable_config.comp_en       ? "Yes" : "No");
+    printf("Barometer Enabled:   %s\n", sys_enable_config.baro_en       ? "Yes" : "No");
+    printf("MQTT Enabled:        %s\n", sys_enable_config.mqtt_en       ? "Yes" : "No");
+    printf("OTA Enabled:         %s\n", sys_enable_config.ota_en        ? "Yes" : "No");
+    printf("Debug Mode:          %s\n", sys_enable_config.debug_mode    ? "Yes" : "No");
+    printf("Factory Mode:        %s\n", sys_enable_config.factory_mode  ? "Yes" : "No");
+}
+
 void config_init(void) {
     parse_system_enable_config();  // ← MUST run first
-
+    print_system_enable();
     if (sys_enable_config.mqtt_en) {
         mqtt_config = malloc(sizeof(mqtt_config_t));
         if (mqtt_config != NULL) {
