@@ -152,4 +152,6 @@ void config_init(void) {
             printk("OTA config allocation failed\n");
         }
     }
+    print_mqtt_config();
+    print_ota_config();
 }
