@@ -27,14 +27,14 @@ struct mqtt_utf8 struct_pass;
 struct mqtt_utf8 struct_user;
 system_enable_t sys_enable_config;
 
-mqtt_config_t     *mqtt_config     = NULL;
-ota_config_t      *ota_config      = NULL;
-hardware_info_t   *hw_info         = NULL;
-modem_info_t      *modem_info      = NULL;
-sensor_config_t   *sensor_config   = NULL;
-gnss_config_t     *gnss_config     = NULL;
-customer_info_t   *customer_info   = NULL;
-message_settings_t *msg_settings = NULL;
+mqtt_config_t mqtt_config;
+ota_config_t ota_config;
+hardware_info_t hw_info;
+modem_info_t modem_info;
+sensor_config_t sensor_config;
+gnss_config_t gnss_config;
+customer_info_t customer_info;
+message_settings_t msg_settings;
 
 
 ConfigEntry entries[MAX_ENTRIES];
@@ -386,37 +386,94 @@ void parse_message_settings(message_settings_t *cfg) {
     v = get_config("units");   if (v) { cfg->units[0]      = '\0'; strncat(cfg->units,      v, sizeof(cfg->units)-1); }
 }
 
-void print_ota_config(void) {
-    if (!ota_config) {
-        printf("OTA config not initialized.\n");
-        return;
-    }
 
-    printf("=== OTA Configuration ===\n");
-    printf("Check Interval: %d\n", ota_config->check_interval);
-    printf("Server Addr:    %s\n", ota_config->server_addr);
-    printf("Server Port:    %d\n", ota_config->server_port);
-    printf("Username:       %s\n", ota_config->username);
-    printf("Password:       %s\n", ota_config->password);
-    printf("TLS Enabled:    %s\n", ota_config->tls_enabled ? "Yes" : "No");
-    printf("Cert Tag:       %s\n", ota_config->cert_tag);
+
+
+
+
+void print_all_configs(void) {
+    print_hardware_info();
+    print_modem_info();
+    print_sensor_config();
+    print_gnss_config();
+    print_mqtt_config();
+    print_ota_config();
+    print_customer_info();
+    print_message_settings();
+}
+
+void print_hardware_info(void) {
+    printf("=== Hardware Information ===\n");
+    printf("Serial Number:        %s\n", hw_info.sn);
+    printf("HW Version:           %s\n", hw_info.hw_ver);
+    printf("FW Version:           %s\n", hw_info.fw_ver);
+    printf("Power Status Enable:  %s\n", hw_info.power_enabled ? "Enabled" : "Disabled");
+}
+
+void print_modem_info(void) {
+    printf("=== Modem Information ===\n");
+    printf("Make:                 %s\n", modem_info.make);
+    printf("Model:                %s\n", modem_info.model);
+    printf("FW Version:           %s\n", modem_info.fw_ver);
+    printf("IMEI:                 %s\n", modem_info.imei);
+    printf("SIM Provider:         %s\n", modem_info.sim);
+    printf("eSIM Provider:        %s\n", modem_info.esim);
+    printf("LTE Bandmask:         0x%04X\n", modem_info.lte_bandmask);
+}
+
+void print_sensor_config(void) {
+    printf("=== Sensor Configuration ===\n");
+    printf("Sampling Rate (Hz):   %d\n", sensor_config.sampling_rate);
+    printf("Filter Window Size:   %d\n", sensor_config.filter_window);
+    printf("Auto Calibration:     %s\n", sensor_config.auto_calibrate ? "Enabled" : "Disabled");
+}
+
+void print_gnss_config(void) {
+    printf("=== GNSS Configuration ===\n");
+    printf("Update Rate (Hz):     %d\n", gnss_config.update_rate);
+    printf("Module Version:       %s\n", gnss_config.version);
+    printf("Constellation Mask:   0x%02X\n", gnss_config.constellation_mask);
+    printf("Accuracy Threshold:   %d meters\n", gnss_config.accuracy_threshold);
 }
 
 void print_mqtt_config(void) {
-    if (!mqtt_config) {
-        printf("MQTT config not initialized.\n");
-        return;
-    }
-
     printf("=== MQTT Configuration ===\n");
-    printf("Publish Rate:  %d\n", mqtt_config->publish_rate);
-    printf("Broker Addr:   %s\n", mqtt_config->broker_addr);
-    printf("Broker Port:   %d\n", mqtt_config->broker_port);
-    printf("Client ID:     %s\n", mqtt_config->client_id);
-    printf("Username:      %s\n", mqtt_config->username);
-    printf("Password:      %s\n", mqtt_config->password);
-    printf("TLS Enabled:   %s\n", mqtt_config->tls_enabled ? "Yes" : "No");
-    printf("QoS:           %d\n", mqtt_config->qos);
+    printf("Publish Rate:  %d\n", mqtt_config.publish_rate);
+    printf("Broker Addr:   %s\n", mqtt_config.broker_addr);
+    printf("Broker Port:   %d\n", mqtt_config.broker_port);
+    printf("Client ID:     %s\n", mqtt_config.client_id);
+    printf("Username:      %s\n", mqtt_config.username);
+    printf("Password:      %s\n", mqtt_config.password);
+    printf("TLS Enabled:   %s\n", mqtt_config.tls_enabled ? "Yes" : "No");
+    printf("QoS:           %d\n", mqtt_config.qos);
+}
+
+void print_ota_config(void) {
+    printf("=== OTA Configuration ===\n");
+    printf("Check Interval: %d\n", ota_config.check_interval);
+    printf("Server Addr:    %s\n", ota_config.server_addr);
+    printf("Server Port:    %d\n", ota_config.server_port);
+    printf("Username:       %s\n", ota_config.username);
+    printf("Password:       %s\n", ota_config.password);
+    printf("TLS Enabled:    %s\n", ota_config.tls_enabled ? "Yes" : "No");
+    printf("Cert Tag:       %s\n", ota_config.cert_tag);
+}
+
+void print_customer_info(void) {
+    printf("=== Customer Information ===\n");
+    printf("UAS Number:           %s\n", customer_info.uas_num);
+    printf("Description:          %s\n", customer_info.description);
+    printf("UAS STATUS:           %s\n", customer_info.uas_status);
+    printf("Custom Field 2:       %s\n", customer_info.field2);
+    printf("Custom Field 3:       %s\n", customer_info.field3);
+    printf("Custom Field 4:       %s\n", customer_info.field4);
+}
+
+void print_message_settings(void) {
+    printf("=== Message Settings ===\n");
+    printf("Message Format:       %s\n", msg_settings.msg_format);
+    printf("GPS Format:           %s\n", msg_settings.gps_format);
+    printf("Units:                %s\n", msg_settings.units);
 }
 
 void print_system_enable(void) {
@@ -436,173 +493,61 @@ void print_system_enable(void) {
     printf("Factory Mode:        %s\n", sys_enable_config.factory_mode  ? "Yes" : "No");
 }
 
-void print_sensor_config(void) {
-    if (!sensor_config) {
-        printf("Sensor config not initialized.\n");
-        return;
-    }
-
-    printf("=== Sensor Configuration ===\n");
-    printf("Sampling Rate (Hz):   %d\n", sensor_config->sampling_rate);
-    printf("Filter Window Size:   %d\n", sensor_config->filter_window);
-    printf("Auto Calibration:     %s\n", sensor_config->auto_calibrate ? "Enabled" : "Disabled");
-}
-
-void print_gnss_config(void) {
-    if (!gnss_config) {
-        printf("GNSS config not initialized.\n");
-        return;
-    }
-
-    printf("=== GNSS Configuration ===\n");
-    printf("Update Rate (Hz):     %d\n", gnss_config->update_rate);
-    printf("Module Version:       %s\n", gnss_config->version);
-    printf("Constellation Mask:   0x%02X\n", gnss_config->constellation_mask);
-    printf("Accuracy Threshold:   %d meters\n", gnss_config->accuracy_threshold);
-}
-void print_hardware_info(void) {
-    if (!hw_info) {
-        printf("Hardware info not initialized.\n");
-        return;
-    }
-
-    printf("=== Hardware Information ===\n");
-    printf("Serial Number:        %s\n", hw_info->sn);
-    printf("HW Version:           %s\n", hw_info->hw_ver);
-    printf("FW Version:           %s\n", hw_info->fw_ver);
-    printf("Power Status Enable:  %s\n", hw_info->power_enabled ? "Enabled" : "Disabled");
-}
-
-void print_modem_info(void) {
-    if (!modem_info) {
-        printf("Modem info not initialized.\n");
-        return;
-    }
-
-    printf("=== Modem Information ===\n");
-    printf("Make:                 %s\n", modem_info->make);
-    printf("Model:                %s\n", modem_info->model);
-    printf("FW Version:           %s\n", modem_info->fw_ver);
-    printf("IMEI:                 %s\n", modem_info->imei);
-    printf("SIM Provider:         %s\n", modem_info->sim);
-    printf("eSIM Provider:        %s\n", modem_info->esim);
-    printf("LTE Bandmask:         0x%04X\n", modem_info->lte_bandmask);
-}
-
-void print_customer_info(void) {
-    if (!customer_info) {
-        printf("Customer info not initialized.\n");
-        return;
-    }
-
-    printf("=== Customer Information ===\n");
-    printf("UAS Number:           %s\n", customer_info->uas_num);
-    printf("Description:          %s\n", customer_info->description);
-    printf("UAS STATUS:       %s\n", customer_info->uas_status);
-    printf("Custom Field 2:       %s\n", customer_info->field2);
-    printf("Custom Field 3:       %s\n", customer_info->field3);
-    printf("Custom Field 4:       %s\n", customer_info->field4);
-}
-
-void print_message_settings(void) {
-    if (!msg_settings) {
-        printf("Message settings not initialized.\n");
-        return;
-    }
-
-    printf("=== Message Settings ===\n");
-    printf("Message Format:       %s\n", msg_settings->msg_format);
-    printf("GPS Format:           %s\n", msg_settings->gps_format);
-    printf("Units:                %s\n", msg_settings->units);
-}
-
-void print_all_configs(void) {
-    
-    print_hardware_info();
-    print_modem_info();
-    print_sensor_config();
-    print_gnss_config();
-    print_mqtt_config();
-    print_ota_config();
-    print_customer_info();
-    print_message_settings();
-}
-
-
-
-
-
-
 void config_init(void) {
     parse_system_enable_config();
     if (sys_enable_config.debug_mode) {
         print_system_enable();
     }
     LOG_INF("System enable config parsed successfully.");
+
     if (sys_enable_config.hw_en) {
-        hw_info = malloc(sizeof(hardware_info_t));
-        if (hw_info) {
-            memset(hw_info, 0, sizeof(*hw_info));
-            parse_hardware_info(hw_info);
-        }
+        memset(&hw_info, 0, sizeof(hw_info));
+        parse_hardware_info(&hw_info);
     }
     LOG_INF("Hardware info parsed successfully.");
+
     if (sys_enable_config.mdm_en) {
-        modem_info = malloc(sizeof(modem_info_t));
-        if (modem_info) {
-            memset(modem_info, 0, sizeof(*modem_info));
-            parse_modem_info(modem_info);
-        }
+        memset(&modem_info, 0, sizeof(modem_info));
+        parse_modem_info(&modem_info);
     }
     LOG_INF("Modem info parsed successfully.");
+
     if (sys_enable_config.imu_en || sys_enable_config.comp_en || sys_enable_config.baro_en) {
-        sensor_config = malloc(sizeof(sensor_config_t));
-        if (sensor_config) {
-            memset(sensor_config, 0, sizeof(*sensor_config));
-            parse_sensor_config(sensor_config);
-        }
+        memset(&sensor_config, 0, sizeof(sensor_config));
+        parse_sensor_config(&sensor_config);
     }
     LOG_INF("Sensor config parsed successfully.");
+
     if (sys_enable_config.gnss_en) {
-        gnss_config = malloc(sizeof(gnss_config_t));
-        if (gnss_config) {
-            memset(gnss_config, 0, sizeof(*gnss_config));
-            parse_gnss_config(gnss_config);
-        }
-        struct_pass.utf8 = mqtt_config->password;
-        struct_pass.size = strlen(mqtt_config->password);
-        struct_user.utf8 = mqtt_config->username;
-        struct_user.size = strlen(mqtt_config->username);
+        memset(&gnss_config, 0, sizeof(gnss_config));
+        parse_gnss_config(&gnss_config);
     }
     LOG_INF("GNSS config parsed successfully.");
+
     if (sys_enable_config.mqtt_en) {
-        mqtt_config = malloc(sizeof(mqtt_config_t));
-        if (mqtt_config) {
-            memset(mqtt_config, 0, sizeof(*mqtt_config));
-            parse_mqtt_config(mqtt_config);
-        }
+        memset(&mqtt_config, 0, sizeof(mqtt_config));
+        parse_mqtt_config(&mqtt_config);
+        struct_pass.utf8 = mqtt_config.password;
+        struct_pass.size = strlen(mqtt_config.password);
+        struct_user.utf8 = mqtt_config.username;
+        struct_user.size = strlen(mqtt_config.username);
     }
     LOG_INF("MQTT config parsed successfully.");
+
     if (sys_enable_config.ota_en) {
-        ota_config = malloc(sizeof(ota_config_t));
-        if (ota_config) {
-            memset(ota_config, 0, sizeof(*ota_config));
-            parse_ota_config(ota_config);
-        }
+        memset(&ota_config, 0, sizeof(ota_config));
+        parse_ota_config(&ota_config);
     }
     LOG_INF("OTA config parsed successfully.");
-    customer_info = malloc(sizeof(customer_info_t));
-    if (customer_info) {
-        memset(customer_info, 0, sizeof(*customer_info));
-        parse_customer_info(customer_info);
-    }
+
+    memset(&customer_info, 0, sizeof(customer_info));
+    parse_customer_info(&customer_info);
     LOG_INF("Customer info parsed successfully.");
-    msg_settings = malloc(sizeof(*msg_settings));
-    if (msg_settings) {
-        memset(msg_settings, 0, sizeof(*msg_settings));
-        parse_message_settings(msg_settings);
-    }
+
+    memset(&msg_settings, 0, sizeof(msg_settings));
+    parse_message_settings(&msg_settings);
     LOG_INF("Message settings parsed successfully.");
+
     if (sys_enable_config.debug_mode) {
         print_all_configs();
     }
