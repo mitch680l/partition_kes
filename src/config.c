@@ -534,6 +534,7 @@ void config_init(void) {
     if (sys_enable_config.debug_mode) {
         print_system_enable();
     }
+    LOG_INF("System enable config parsed successfully.");
     if (sys_enable_config.hw_en) {
         hw_info = malloc(sizeof(hardware_info_t));
         if (hw_info) {
@@ -541,7 +542,7 @@ void config_init(void) {
             parse_hardware_info(hw_info);
         }
     }
-
+    LOG_INF("Hardware info parsed successfully.");
     if (sys_enable_config.mdm_en) {
         modem_info = malloc(sizeof(modem_info_t));
         if (modem_info) {
@@ -549,7 +550,7 @@ void config_init(void) {
             parse_modem_info(modem_info);
         }
     }
-
+    LOG_INF("Modem info parsed successfully.");
     if (sys_enable_config.imu_en || sys_enable_config.comp_en || sys_enable_config.baro_en) {
         sensor_config = malloc(sizeof(sensor_config_t));
         if (sensor_config) {
@@ -557,7 +558,7 @@ void config_init(void) {
             parse_sensor_config(sensor_config);
         }
     }
-
+    LOG_INF("Sensor config parsed successfully.");
     if (sys_enable_config.gnss_en) {
         gnss_config = malloc(sizeof(gnss_config_t));
         if (gnss_config) {
@@ -569,7 +570,7 @@ void config_init(void) {
         struct_user.utf8 = mqtt_config->username;
         struct_user.size = strlen(mqtt_config->username);
     }
-
+    LOG_INF("GNSS config parsed successfully.");
     if (sys_enable_config.mqtt_en) {
         mqtt_config = malloc(sizeof(mqtt_config_t));
         if (mqtt_config) {
@@ -577,7 +578,7 @@ void config_init(void) {
             parse_mqtt_config(mqtt_config);
         }
     }
-
+    LOG_INF("MQTT config parsed successfully.");
     if (sys_enable_config.ota_en) {
         ota_config = malloc(sizeof(ota_config_t));
         if (ota_config) {
@@ -585,19 +586,19 @@ void config_init(void) {
             parse_ota_config(ota_config);
         }
     }
-
+    LOG_INF("OTA config parsed successfully.");
     customer_info = malloc(sizeof(customer_info_t));
     if (customer_info) {
         memset(customer_info, 0, sizeof(*customer_info));
         parse_customer_info(customer_info);
     }
-
+    LOG_INF("Customer info parsed successfully.");
     msg_settings = malloc(sizeof(*msg_settings));
     if (msg_settings) {
         memset(msg_settings, 0, sizeof(*msg_settings));
         parse_message_settings(msg_settings);
     }
-
+    LOG_INF("Message settings parsed successfully.");
     if (sys_enable_config.debug_mode) {
         print_all_configs();
     }
