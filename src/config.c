@@ -208,6 +208,10 @@ void parse_encrypted_blob(void)
 void parse_hardware_info(hardware_info_t *cfg) {
     const char *val;
 
+    if (!cfg) {
+    LOG_ERR("parse_hardware_info: cfg is NULL!");
+    return;
+    }
     cfg->sn[0] = cfg->hw_ver[0] = cfg->fw_ver[0] = '\0';
     cfg->power_enabled = false;
 
