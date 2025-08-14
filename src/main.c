@@ -15,6 +15,7 @@
 #include "fota.h"
 #include "enc.h"
 #include "test.h"
+#include "config.h"
 #include <zephyr/kernel.h>
 #include <zephyr/shell/shell.h>
 #include <zephyr/init.h>
@@ -40,38 +41,11 @@ LOG_MODULE_REGISTER(hmac, LOG_LEVEL_DBG);
 #define HMAC_KEY_ID ((psa_key_id_t)0x6001)
 #define HMAC_KEY_LEN 32
 
-#define MAX_INPUT_LEN 256
-#define BLOB_HEADER_SIZE 0
-#define ENTRY_SIZE 128
-#define MAX_ENTRIES         16
-#define MAX_IV_LEN          16
-#define MAX_AAD_LEN         64
-#define MAX_CIPHERTEXT_LEN  256
-#define FLASH_PAGE_SIZE  4096 
-#define ENTRIES_PER_PAGE (FLASH_PAGE_SIZE / ENTRY_SIZE)
-#define CONFIG_PAGE_COUNT 2  
-#define TOTAL_ENTRIES     (CONFIG_PAGE_COUNT * ENTRIES_PER_PAGE) 
-#define ENCRYPTED_BLOB_ADDR ((const uint8_t *)0xfb000)
-#define ENCRYPTED_BLOB_SIZE 8192 
-#define FLASH_CRC_PAGE_OFFSET (CONFIG_PAGE_COUNT * FLASH_PAGE_SIZE)
-#define FLASH_PAGE_CRC_SIZE  (ENCRYPTED_BLOB_SIZE - FLASH_CRC_PAGE_OFFSET)
-#define CRC_LOCATION_OFFSET (ENCRYPTED_BLOB_SIZE - 4)
 
-typedef struct {
-    uint8_t iv[MAX_IV_LEN];
-    uint8_t iv_len;
 
-    uint8_t aad[MAX_AAD_LEN];
-    uint16_t aad_len;
 
-    uint8_t ciphertext[MAX_CIPHERTEXT_LEN];
-    uint16_t ciphertext_len;
 
-    uint32_t mem_offset;  
-} ConfigEntry;
 
-static ConfigEntry entries[MAX_ENTRIES];
-static int num_entries = 0;
 
 static inline uint16_t read_u16_le(const uint8_t *p) {
     return p[0] | (p[1] << 8);

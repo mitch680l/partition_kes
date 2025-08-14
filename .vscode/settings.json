@@ -8,7 +8,8 @@
         "system_error": "c",
         "shell.h": "c",
         "protected_storage.h": "c",
-        "ctype.h": "c"
+        "ctype.h": "c",
+        "kernel.h": "c"
     },
     "nrf-connect.applications": []
 }

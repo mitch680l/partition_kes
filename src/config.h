@@ -1,6 +1,17 @@
 #include <stdbool.h>
 #include <stdint.h>
+#include <zephyr/kernel.h>
+#include <zephyr/sys/printk.h>
+#include <zephyr/logging/log.h>
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <psa/crypto.h>
+#include <psa/crypto_extra.h>
+#include <psa/protected_storage.h>
+#include <psa/crypto.h>
+#include <string.h>
+#include <tfm_ns_interface.h>
 #define GPS_READ_BUFFER_SIZE 126  
 #define GPS_STARTUP_DELAY_MS 2000  
 #define GPS_CONFIG_TIMEOUT_MS 500  
@@ -63,11 +74,6 @@
 
 #define MAX_BLOB (8 * 1024) 
 #define PBKDF2_ITERATIONS 64000u
-extern char mqtt_client_id[MQTT_MAX_STR_LEN];               
-extern int  mqtt_broker_port;
-extern int interval_mqtt;
-extern int fota_interval_ms;
-extern int gps_target_rate;
 extern char firmware_filename[MQTT_MAX_STR_LEN];
 extern char json_payload[512];
 extern char sensor_payload[512];
@@ -80,9 +86,7 @@ extern char fota_host[MQTT_MAX_STR_LEN];
 extern struct mqtt_utf8 struct_pass;
 extern struct mqtt_utf8 struct_user;
 
-void set_user_pass(void);
-void clear_user_pass(void);
-void config_init();
+
 
 typedef struct {
     bool lte_en;
@@ -184,6 +188,23 @@ typedef struct {
     char units[16];       
 } message_settings_t;
 
+typedef struct {
+    uint8_t iv[MAX_IV_LEN];
+    uint8_t iv_len;
+
+    uint8_t aad[MAX_AAD_LEN];
+    uint16_t aad_len;
+
+    uint8_t ciphertext[MAX_CIPHERTEXT_LEN];
+    uint16_t ciphertext_len;
+
+    uint32_t mem_offset;  
+} ConfigEntry;
+
+
+extern ConfigEntry entries[MAX_ENTRIES];
+extern int num_entries;
+
 extern mqtt_config_t *mqtt_config;
 extern ota_config_t *ota_config;
 extern hardware_info_t *hw_info;
@@ -192,3 +213,14 @@ extern sensor_config_t *sensor_config;
 extern gnss_config_t *gnss_config;
 extern customer_info_t *customer_info;
 extern message_settings_t *message_settings;
+
+void parse_encrypted_blob(void);
+const char *get_config(const char *aad);
+void config_init(void);
+uint32_t manual_crc32(const uint8_t *data, size_t len);
+int open_persistent_key();
+
+int decrypt_config_field_data(const char *encrypted_data, size_t encrypted_len,
+                              const char *iv,
+                              const char *additional_data, size_t additional_len,
+                              char *output_buf, size_t *output_len);

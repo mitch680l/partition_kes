@@ -12,24 +12,12 @@
 #include "config.h"
 
 
-psa_key_id_t my_key_id = 0x00000005;
-psa_key_handle_t my_key_handle;
+
 
 
 LOG_MODULE_REGISTER(aes_gcm, LOG_LEVEL_DBG);
 
-typedef struct {
-    uint8_t iv[MAX_IV_LEN];
-    uint8_t iv_len;
-    uint8_t aad[MAX_AAD_LEN];
-    uint16_t aad_len;
-    uint8_t ciphertext[MAX_CIPHERTEXT_LEN];
-    uint16_t ciphertext_len;
-    uint32_t mem_offset;
-} ConfigEntry;
 
-static ConfigEntry entries[MAX_ENTRIES];
-static int num_entries = 0;
 
 #define PRINT_HEX(label, buf, len)                                      \
     do {                                                                 \
@@ -219,27 +207,7 @@ SYS_INIT(shell_lockdown_init, APPLICATION, 50);
 
 
 
-uint32_t manual_crc32(const uint8_t *data, size_t len) {
-    uint32_t crc = 0xFFFFFFFF;
 
-    LOG_INF("Starting manual CRC-32 over %u bytes", (unsigned int)len);
-
-    for (size_t i = 0; i < len; i++) {
-        uint8_t byte = data[i];
-        crc ^= byte;
-        for (int j = 0; j < 8; j++) {
-            if (crc & 1)
-                crc = (crc >> 1) ^ 0xEDB88320;
-            else
-                crc >>= 1;
-        }
-    }
-
-    crc ^= 0xFFFFFFFF;
-
-    LOG_INF("Final manual CRC-32: 0x%08X", crc);
-    return crc;
-}
 
 
 
@@ -263,132 +231,7 @@ void secure_memzero(void *v, size_t n)
     while (n--) { *p++ = 0; }
 }
 
-int open_persistent_key()
-{
-    psa_status_t status;
 
-    status = psa_open_key(my_key_id, &my_key_handle);
-    if (status != PSA_SUCCESS) {
-        LOG_ERR("psa_open_key(0x%08x) failed: %d", my_key_id, status);
-        return status;
-    }
-
-    LOG_INF("Persistent key 0x%08x opened successfully", my_key_id);
-    return status;
-}
-
-int decrypt_config_field_data(const char *encrypted_data, size_t encrypted_len,
-                              const char *iv,
-                              const char *additional_data, size_t additional_len,
-                              char *output_buf, size_t *output_len)
-{
-    if (!encrypted_data || !iv || !additional_data || !output_buf || !output_len) {
-        LOG_ERR("Invalid input to decrypt_config_field_data");
-        return PROVISIONING_ERROR_BUFFER_SIZE;
-    }
-
-    psa_status_t status;
-
-    //LOG_INF("Decrypting config field...");
-
-    status = psa_aead_decrypt(my_key_id,
-                              PSA_ALG_GCM,
-                              iv, NRF_CRYPTO_EXAMPLE_AES_IV_SIZE,
-                              additional_data, additional_len,
-                              encrypted_data, encrypted_len,
-                              output_buf, NRF_CRYPTO_EXAMPLE_AES_MAX_TEXT_SIZE,
-                              output_len);
-
-    if (status != PSA_SUCCESS) {
-        LOG_ERR("Field decryption failed (psa_status: %d)", status);
-        return PROVISIONING_ERROR_DECRYPT;
-    }
-
-    //LOG_INF("Field decryption successful (length: %u)", *output_len);
-    return PROVISIONING_SUCCESS;
-}
-
-int encrypt_config_field_data(const char *plaintext_data, size_t plaintext_len,
-                              char *iv_out,
-                              const char *additional_data, size_t additional_len,
-                              char *encrypted_out, size_t *encrypted_len)
-{
-    if (!plaintext_data || !iv_out || !additional_data || !encrypted_out || !encrypted_len) {
-        LOG_ERR("Invalid input to encrypt_config_field_data");
-        return PROVISIONING_ERROR_BUFFER_SIZE;
-    }
-
-    psa_status_t status;
-
-    status = psa_generate_random((uint8_t*)iv_out, NRF_CRYPTO_EXAMPLE_AES_IV_SIZE);
-    if (status != PSA_SUCCESS) {
-        LOG_ERR("IV generation failed (psa_status: %d)", status);
-        return PROVISIONING_ERROR_IV_GEN;
-    }
-
-    LOG_INF("Encrypting config field...");
-
-    status = psa_aead_encrypt(my_key_id,
-                              PSA_ALG_GCM,
-                              iv_out, NRF_CRYPTO_EXAMPLE_AES_IV_SIZE,
-                              additional_data, additional_len,
-                              plaintext_data, plaintext_len,
-                              encrypted_out, MAX_CIPHERTEXT_LEN,
-                              encrypted_len);
-
-    if (status != PSA_SUCCESS) {
-        LOG_ERR("Field encryption failed (psa_status: %d)", status);
-        return PROVISIONING_ERROR_ENCRYPT;
-    }
-
-    LOG_INF("Field encryption successful (length: %u)", *encrypted_len);
-    return PROVISIONING_SUCCESS;
-}
-
-
-
-static int update_crc(void)
-{
-    const struct flash_area *fa;
-    int err = flash_area_open(FLASH_AREA_ID(encrypted_blob_slot0), &fa);
-    if (err) {
-        LOG_ERR("flash_area_open for CRC failed: %d", err);
-        return err;
-    }
-
-    uint32_t new_crc = manual_crc32(ENCRYPTED_BLOB_ADDR, ENCRYPTED_BLOB_SIZE - 4);
-    uint32_t crc_offset = CRC_LOCATION_OFFSET;
-    uint32_t page_start = (crc_offset / FLASH_PAGE_SIZE) * FLASH_PAGE_SIZE;
-
-    static uint8_t page_buf[FLASH_PAGE_SIZE];
-
-    err = flash_area_read(fa, page_start, page_buf, FLASH_PAGE_SIZE);
-    if (err) {
-        LOG_ERR("flash_area_read for CRC page failed: %d", err);
-        flash_area_close(fa);
-        return err;
-    }
-
-    uint32_t crc_offset_in_page = crc_offset - page_start;
-    memcpy(&page_buf[crc_offset_in_page], &new_crc, 4);
-
-    err = flash_area_erase(fa, page_start, FLASH_PAGE_SIZE);
-    if (err) {
-        LOG_ERR("flash_area_erase CRC page failed: %d", err);
-        flash_area_close(fa);
-        return err;
-    }
-
-    err = flash_area_write(fa, page_start, page_buf, FLASH_PAGE_SIZE);
-    if (err) {
-        LOG_ERR("CRC write failed: %d", err);
-    } else {
-        LOG_INF("CRC updated: 0x%08X at offset 0x%x", new_crc, crc_offset);
-    }
-
-    flash_area_close(fa);
-    return err;
-}
 
 /* ---------- Shell handlers (write/erase guarded) ---------- */
 
@@ -616,37 +459,7 @@ static int update_single_entry(int index, const uint8_t *new_data, size_t data_l
     return update_crc();
 }
 
-const char *get_config(const char *aad)
-{
-    static char decrypted[DECRYPTED_OUTPUT_MAX]; // persistent output
-    size_t decrypted_len = 0;
 
-    for (int i = 0; i < num_entries; i++) {
-        ConfigEntry *e = &entries[i];
-
-        if (e->aad_len == strlen(aad) &&
-            memcmp(e->aad, aad, e->aad_len) == 0) {
-
-            int ret = decrypt_config_field_data(
-                (const char *)e->ciphertext, e->ciphertext_len,
-                (const char *)e->iv,
-                (const char *)e->aad, e->aad_len,
-                decrypted, &decrypted_len
-            );
-
-            if (ret != 0) {
-                LOG_ERR("Decryption failed for AAD: %s", aad);
-                return NULL;
-            }
-
-            decrypted[decrypted_len] = '\0'; // null-terminate
-            return decrypted;
-        }
-    }
-
-    LOG_WRN("AAD not found: %s", aad);
-    return "NULL";
-}
 
 /* ---------- read/inspect commands (no auth required) ---------- */
 
@@ -977,72 +790,6 @@ static int cmd_erase_page(const struct shell *shell, size_t argc, char **argv)
 }
 
 
-
-void parse_encrypted_blob(void)
-{
-    const uint8_t *start = ENCRYPTED_BLOB_ADDR;
-    const uint8_t *end = ENCRYPTED_BLOB_ADDR + ENCRYPTED_BLOB_SIZE;
-    const size_t entry_span = ENTRY_SIZE;
-    const size_t max_offset = CRC_LOCATION_OFFSET;
-
-    LOG_INF("Begin blob parsing at address %p, total size: %d", (void *)start, ENCRYPTED_BLOB_SIZE);
-
-    uint32_t computed_crc = manual_crc32(start, ENCRYPTED_BLOB_SIZE - 4);
-    uint32_t stored_crc = *(uint32_t *)(start + CRC_LOCATION_OFFSET);
-    if (computed_crc != stored_crc) {
-        LOG_WRN("CRC mismatch: computed=0x%08X, stored=0x%08X", computed_crc, stored_crc);
-    } else {
-        LOG_INF("CRC check passed: 0x%08X", computed_crc);
-    }
-
-    num_entries = 0;
-
-    for (uintptr_t offset = 0; offset + entry_span <= max_offset && num_entries < MAX_ENTRIES; offset += entry_span) {
-        const uint8_t *ptr = start + offset;
-
-        if (ptr[0] == 0xFF) {
-            continue;
-        }
-
-        ConfigEntry *e = &entries[num_entries];
-        e->mem_offset = offset;
-
-        e->iv_len = *ptr++;
-        if (e->iv_len > MAX_IV_LEN || ptr + e->iv_len > end) {
-            LOG_ERR("Invalid or oversized IV length: %d at entry %d", e->iv_len, num_entries);
-            continue;
-        }
-        memcpy(e->iv, ptr, e->iv_len);
-        ptr += e->iv_len;
-
-        if (ptr + 2 > end) continue;
-        e->aad_len = ptr[0] | (ptr[1] << 8);
-        ptr += 2;
-        if (e->aad_len > MAX_AAD_LEN || ptr + e->aad_len > end) {
-            LOG_ERR("Invalid or oversized AAD length: %d at entry %d", e->aad_len, num_entries);
-            continue;
-        }
-        memcpy(e->aad, ptr, e->aad_len);
-        ptr += e->aad_len;
-
-        if (ptr + 2 > end) continue;
-        e->ciphertext_len = ptr[0] | (ptr[1] << 8);
-        ptr += 2;
-        if (e->ciphertext_len > MAX_CIPHERTEXT_LEN || ptr + e->ciphertext_len > end) {
-            LOG_ERR("Invalid or oversized ciphertext length: %d at entry %d", e->ciphertext_len, num_entries);
-            continue;
-        }
-        memcpy(e->ciphertext, ptr, e->ciphertext_len);
-        ptr += e->ciphertext_len;
-
-        LOG_INF("Parsed entry %d @ offset 0x%04X: IV=%d, AAD=%d, Cipher+Tag=%d",
-                num_entries, (int)offset, e->iv_len, e->aad_len, e->ciphertext_len);
-
-        num_entries++;
-    }
-
-    LOG_INF("Total parsed entries: %d", num_entries);
-}
 
 
 void get_all_config_entries(const struct shell *shell)
