@@ -299,7 +299,7 @@ int encrypt_and_verify_data(uint8_t *config_data, size_t config_len,
         return PROVISIONING_ERROR_VERIFICATION;
     }
 
-    LOG_INF("Data encryption and verification completed successfully!");
+    LOG_DBG("Data encryption and verification completed successfully!");
     return PROVISIONING_SUCCESS;
 }
 
@@ -332,14 +332,14 @@ int encrypt_config_field(const char *field_name, const char *field_data)
         return PROVISIONING_ERROR_BUFFER_SIZE;
     }
 
-    LOG_INF("\n=== Processing Field: %s (length: %d) ===", field_name, field_len);
-    LOG_INF("Field data: %s", field_name); // Don't log actual data for security
+    LOG_DBG("\n=== Processing Field: %s (length: %d) ===", field_name, field_len);
+    LOG_DBG("Field data: %s", field_name); // Don't log actual data for security
     
     /* Set field-specific additional authenticated data */
     snprintf((char*)additional_data, sizeof(additional_data), "Field_%s", field_name);
     additional_len = strlen((char*)additional_data);
 
-    LOG_INF("About to call encrypt_and_verify_data for field: %s", field_name);
+    LOG_DBG("About to call encrypt_and_verify_data for field: %s", field_name);
 
     /* Encrypt and verify this field */
     status = encrypt_and_verify_data((uint8_t*)field_data, field_len,
@@ -350,7 +350,7 @@ int encrypt_config_field(const char *field_name, const char *field_data)
         return status;
     }
 
-    LOG_INF("=== Field %s processed successfully ===\n", field_name);
+    LOG_DBG("=== Field %s processed successfully ===\n", field_name);
     return PROVISIONING_SUCCESS;
 }
 
@@ -384,7 +384,7 @@ int provision_config_data(void)
     k_sleep(K_MSEC(100)); // Delay for terminal readability
 
     /* First encrypt the original config data */
-    LOG_INF("\n=== Processing Original Config Data ===");
+    LOG_DBG("\n=== Processing Original Config Data ===");
     status = encrypt_and_verify_data(m_config_data, config_len,
                                     m_additional_data, additional_len,
                                     m_iv, encrypted_data, &encrypted_len);
@@ -395,12 +395,12 @@ int provision_config_data(void)
     k_sleep(K_MSEC(100)); // Delay for terminal readability
 
     /* Now encrypt each configuration field independently */
-    LOG_INF("\n=== Processing Individual Configuration Fields ===");
-    LOG_INF("Fields to process: username, password, hostname, mqtt_hostname");
+    LOG_DBG("\n=== Processing Individual Configuration Fields ===");
+    LOG_DBG("Fields to process: username, password, hostname, mqtt_hostname");
     k_sleep(K_MSEC(100)); // Delay for terminal readability
 
     /* Username */
-    LOG_INF("Processing username field...");
+    LOG_DBG("Processing username field...");
     status = encrypt_config_field("username", m_username);
     if (status != PROVISIONING_SUCCESS) {
         LOG_ERR("Username encryption failed: %d", status);
@@ -410,7 +410,7 @@ int provision_config_data(void)
     k_sleep(K_MSEC(100)); // Delay for terminal readability
 
     /* Password */
-    LOG_INF("Processing password field...");
+    LOG_DBG("Processing password field...");
     status = encrypt_config_field("password", m_password);
     if (status != PROVISIONING_SUCCESS) {
         LOG_ERR("Password encryption failed: %d", status);
@@ -420,7 +420,7 @@ int provision_config_data(void)
     k_sleep(K_MSEC(100)); // Delay for terminal readability
 
     /* Hostname */
-    LOG_INF("Processing hostname field...");
+    LOG_DBG("Processing hostname field...");
     status = encrypt_config_field("hostname", m_hostname);
     if (status != PROVISIONING_SUCCESS) {
         LOG_ERR("Hostname encryption failed: %d", status);
@@ -430,7 +430,7 @@ int provision_config_data(void)
     k_sleep(K_MSEC(100)); // Delay for terminal readability
 
     /* MQTT Hostname */
-    LOG_INF("Processing mqtt_hostname field...");
+    LOG_DBG("Processing mqtt_hostname field...");
     status = encrypt_config_field("mqtt_hostname", m_mqtt_hostname);
     if (status != PROVISIONING_SUCCESS) {
         LOG_ERR("MQTT hostname encryption failed: %d", status);

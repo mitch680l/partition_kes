@@ -81,8 +81,7 @@ extern char topic_gps[64];
 extern char topic_sensor[64];
 extern char topic_lte[64];
 
-extern char mqtt_broker_host[MQTT_MAX_STR_LEN];
-extern char fota_host[MQTT_MAX_STR_LEN];
+
 extern struct mqtt_utf8 struct_pass;
 extern struct mqtt_utf8 struct_user;
 
@@ -218,9 +217,4 @@ void parse_encrypted_blob(void);
 const char *get_config(const char *aad);
 void config_init(void);
 uint32_t manual_crc32(const uint8_t *data, size_t len);
-int open_persistent_key();
-
-int decrypt_config_field_data(const char *encrypted_data, size_t encrypted_len,
-                              const char *iv,
-                              const char *additional_data, size_t additional_len,
-                              char *output_buf, size_t *output_len);
+int update_crc(void);

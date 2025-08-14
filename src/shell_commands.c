@@ -8,7 +8,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <stdio.h>
-
+#include "encryption_helper.h"
 #include "config.h"
 
 
@@ -358,50 +358,6 @@ static int cmd_erase_entry(const struct shell *shell, size_t argc, char **argv)
     return ret;
 }
 
-int create_encrypted_entry_with_aad(const char *plaintext_aad, const char *plaintext, uint8_t *entry_buf)
-{
-    if (!plaintext || !entry_buf || !plaintext_aad) return -EINVAL;
-
-    char iv[NRF_CRYPTO_EXAMPLE_AES_IV_SIZE];
-    static char encrypted[MAX_CIPHERTEXT_LEN];
-    size_t encrypted_len;
-    size_t plaintext_len = strlen(plaintext);
-    size_t aad_len = strlen(plaintext_aad);
-
-    int ret = encrypt_config_field_data(plaintext, plaintext_len,
-                                        iv, plaintext_aad, aad_len,
-                                        encrypted, &encrypted_len);
-    if (ret != PROVISIONING_SUCCESS) {
-        LOG_ERR("Encryption failed: %d", ret);
-        return ret;
-    }
-
-    uint8_t *ptr = entry_buf;
-
-    *ptr++ = NRF_CRYPTO_EXAMPLE_AES_IV_SIZE;
-    memcpy(ptr, iv, NRF_CRYPTO_EXAMPLE_AES_IV_SIZE);
-    ptr += NRF_CRYPTO_EXAMPLE_AES_IV_SIZE;
-
-    *ptr++ = aad_len & 0xFF;
-    *ptr++ = (aad_len >> 8) & 0xFF;
-    memcpy(ptr, plaintext_aad, aad_len);
-    ptr += aad_len;
-
-    *ptr++ = encrypted_len & 0xFF;
-    *ptr++ = (encrypted_len >> 8) & 0xFF;
-    memcpy(ptr, encrypted, encrypted_len);
-    ptr += encrypted_len;
-
-    size_t used = ptr - entry_buf;
-    if (used < ENTRY_SIZE) {
-        memset(ptr, 0x00, ENTRY_SIZE - used);
-    }
-
-    LOG_INF("Created encrypted entry: AAD=\"%s\", len=%zu, plaintext_len=%zu, total_used=%zu",
-            plaintext_aad, aad_len, plaintext_len, used);
-
-    return 0;
-}
 
 static int update_single_entry(int index, const uint8_t *new_data, size_t data_len)
 {

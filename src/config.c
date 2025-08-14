@@ -11,12 +11,9 @@
 #include <zephyr/net/tls_credentials.h>
 #include <zephyr/random/random.h>
 #include <nrf_modem_at.h>
-#include "shell_commands.h"
-#include <dk_buttons_and_leds.h>
 #include <modem/modem_key_mgmt.h>
 #include <zephyr/sys/crc.h>
 #include <zephyr/storage/flash_map.h>
-#include "shell_commands.h"
 
 LOG_MODULE_REGISTER(configuration, LOG_LEVEL_INF);
 char json_payload[512] = "NO PVT";
@@ -40,99 +37,12 @@ customer_info_t   *customer_info   = NULL;
 message_settings_t *msg_settings = NULL;
 
 
-psa_key_id_t my_key_id = 0x00000005;
-psa_key_handle_t my_key_handle;
-
 ConfigEntry entries[MAX_ENTRIES];
 int num_entries = 0;
 
 
 
-int open_persistent_key()
-{
-    psa_status_t status;
-
-    status = psa_open_key(my_key_id, &my_key_handle);
-    if (status != PSA_SUCCESS) {
-        LOG_ERR("psa_open_key(0x%08x) failed: %d", my_key_id, status);
-        return status;
-    }
-
-    LOG_INF("Persistent key 0x%08x opened successfully", my_key_id);
-    return status;
-}
-
-int decrypt_config_field_data(const char *encrypted_data, size_t encrypted_len,
-                              const char *iv,
-                              const char *additional_data, size_t additional_len,
-                              char *output_buf, size_t *output_len)
-{
-    if (!encrypted_data || !iv || !additional_data || !output_buf || !output_len) {
-        LOG_ERR("Invalid input to decrypt_config_field_data");
-        return PROVISIONING_ERROR_BUFFER_SIZE;
-    }
-
-    psa_status_t status;
-
-    //LOG_INF("Decrypting config field...");
-
-    status = psa_aead_decrypt(my_key_id,
-                              PSA_ALG_GCM,
-                              iv, NRF_CRYPTO_EXAMPLE_AES_IV_SIZE,
-                              additional_data, additional_len,
-                              encrypted_data, encrypted_len,
-                              output_buf, NRF_CRYPTO_EXAMPLE_AES_MAX_TEXT_SIZE,
-                              output_len);
-
-    if (status != PSA_SUCCESS) {
-        LOG_ERR("Field decryption failed (psa_status: %d)", status);
-        return PROVISIONING_ERROR_DECRYPT;
-    }
-
-    //LOG_INF("Field decryption successful (length: %u)", *output_len);
-    return PROVISIONING_SUCCESS;
-}
-
-int encrypt_config_field_data(const char *plaintext_data, size_t plaintext_len,
-                              char *iv_out,
-                              const char *additional_data, size_t additional_len,
-                              char *encrypted_out, size_t *encrypted_len)
-{
-    if (!plaintext_data || !iv_out || !additional_data || !encrypted_out || !encrypted_len) {
-        LOG_ERR("Invalid input to encrypt_config_field_data");
-        return PROVISIONING_ERROR_BUFFER_SIZE;
-    }
-
-    psa_status_t status;
-
-    status = psa_generate_random((uint8_t*)iv_out, NRF_CRYPTO_EXAMPLE_AES_IV_SIZE);
-    if (status != PSA_SUCCESS) {
-        LOG_ERR("IV generation failed (psa_status: %d)", status);
-        return PROVISIONING_ERROR_IV_GEN;
-    }
-
-    LOG_INF("Encrypting config field...");
-
-    status = psa_aead_encrypt(my_key_id,
-                              PSA_ALG_GCM,
-                              iv_out, NRF_CRYPTO_EXAMPLE_AES_IV_SIZE,
-                              additional_data, additional_len,
-                              plaintext_data, plaintext_len,
-                              encrypted_out, MAX_CIPHERTEXT_LEN,
-                              encrypted_len);
-
-    if (status != PSA_SUCCESS) {
-        LOG_ERR("Field encryption failed (psa_status: %d)", status);
-        return PROVISIONING_ERROR_ENCRYPT;
-    }
-
-    LOG_INF("Field encryption successful (length: %u)", *encrypted_len);
-    return PROVISIONING_SUCCESS;
-}
-
-
-
-static int update_crc(void)
+int update_crc(void)
 {
     const struct flash_area *fa;
     int err = flash_area_open(FLASH_AREA_ID(encrypted_blob_slot0), &fa);
