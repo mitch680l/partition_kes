@@ -16,7 +16,7 @@
 #include "fota.h"
 #include <zephyr/shell/shell.h>
 
-#define MAX_BLOB 8192
+
 
 /* Consistent, exact prototypes used by SHELL_CMD_ARG */
 static int cmd_keymgmt_put(const struct shell *sh, size_t argc, char **argv);

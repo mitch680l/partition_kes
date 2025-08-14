@@ -14,7 +14,7 @@
 #include <modem/modem_key_mgmt.h>
 #include <zephyr/sys/crc.h>
 #include <zephyr/storage/flash_map.h>
-
+#include "encryption_helper.h"
 LOG_MODULE_REGISTER(configuration, LOG_LEVEL_INF);
 char json_payload[512] = "NO PVT";
 char sensor_payload[512] = "NO SENSOR DATA";
