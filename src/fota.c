@@ -8,7 +8,7 @@
 #include <zephyr/net/socket.h>
 #include <zephyr/sys/reboot.h>
 #include <zephyr/shell/shell.h>
-
+#include "config.h"
 #include <dfu/dfu_target_mcuboot.h>
 #include <modem/nrf_modem_lib.h>
 #include <modem/lte_lc.h>
@@ -17,15 +17,8 @@
 #include <nrf_socket.h>
 // Configuration defines
 #define CONFIG_DOWNLOAD_HOST "18.234.99.151"
-#define CONFIG_DOWNLOAD_FILE "blinky_2.signed.bin"
 
-#define TLS_SEC_TAG 42
 
-#ifdef CONFIG_USE_HTTPS
-#define SEC_TAG (TLS_SEC_TAG)
-#else
-#define SEC_TAG (-1)
-#endif
 
 enum fota_state { IDLE, CONNECTED, UPDATE_DOWNLOAD, UPDATE_PENDING, UPDATE_APPLY };
 static enum fota_state state = IDLE;
@@ -185,7 +178,7 @@ static int update_download(void)
 		return 0;
 	}
 
-	err = fota_download_start(CONFIG_DOWNLOAD_HOST, CONFIG_DOWNLOAD_FILE, SEC_TAG, 0, 0);
+	err = fota_download_start(CONFIG_DOWNLOAD_HOST, firmware_filename, atoi(ota_config.cert_tag), 0, 0);
 	if (err) {
 		printk("fota_download_start() failed, err %d\n", err);
 		return err;

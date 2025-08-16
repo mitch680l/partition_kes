@@ -22,7 +22,7 @@ char lte_payload[512] = "NO LTE DATA";
 char topic_gps[64] = "gps";
 char topic_sensor[64] = "sensor";
 char topic_lte[64] = "lte";
-char firmware_filename[MQTT_MAX_STR_LEN] = "firmware.bin";
+char firmware_filename[MQTT_MAX_STR_LEN];
 struct mqtt_utf8 struct_pass;
 struct mqtt_utf8 struct_user;
 system_enable_t sys_enable_config;
@@ -388,6 +388,22 @@ void parse_message_settings(message_settings_t *cfg) {
 
 
 
+void set_filename() {
+    const char root[] = "firmware_storage";
+    const char *customer = get_config("name");
+    const char *device = get_config("mq_clid");
+    const char file[] = "zephyr_signed.bin";
+
+    char firmware_filename[MQTT_MAX_STR_LEN];
+
+    snprintf(firmware_filename, sizeof(firmware_filename),
+                  "%s/%s/%s/%s", root, customer, device, file);
+
+
+    printf("Firmware filename: %s\n", firmware_filename);
+}
+
+
 
 
 
@@ -537,6 +553,9 @@ void config_init(void) {
     if (sys_enable_config.ota_en) {
         memset(&ota_config, 0, sizeof(ota_config));
         parse_ota_config(&ota_config);
+        if (ota_config.tls_enabled == false) {
+            strncpy(ota_config.cert_tag, "-1", sizeof(ota_config.cert_tag) - 1);
+        }
     }
     LOG_INF("OTA config parsed successfully.");
 
