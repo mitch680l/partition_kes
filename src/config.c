@@ -407,16 +407,7 @@ void set_filename() {
 
 
 
-void print_all_configs(void) {
-    print_hardware_info();
-    print_modem_info();
-    print_sensor_config();
-    print_gnss_config();
-    print_mqtt_config();
-    print_ota_config();
-    print_customer_info();
-    print_message_settings();
-}
+
 
 void print_hardware_info(void) {
     printf("=== Hardware Information ===\n");
@@ -509,6 +500,17 @@ void print_system_enable(void) {
     printf("Factory Mode:        %s\n", sys_enable_config.factory_mode  ? "Yes" : "No");
 }
 
+void print_all_configs(void) {
+    print_hardware_info();
+    print_modem_info();
+    print_sensor_config();
+    print_gnss_config();
+    print_mqtt_config();
+    print_ota_config();
+    print_customer_info();
+    print_message_settings();
+}
+
 void config_init(void) {
     parse_system_enable_config();
     if (sys_enable_config.debug_mode) {
@@ -556,6 +558,7 @@ void config_init(void) {
         if (ota_config.tls_enabled == false) {
             strncpy(ota_config.cert_tag, "-1", sizeof(ota_config.cert_tag) - 1);
         }
+        set_filename();
     }
     LOG_INF("OTA config parsed successfully.");
 
