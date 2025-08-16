@@ -388,17 +388,34 @@ void parse_message_settings(message_settings_t *cfg) {
 
 
 
-void set_filename() {
+void set_filename(void) {
     const char root[] = "firmware_storage";
-    const char *customer = get_config("name");
-    const char *device = get_config("mq_clid");
     const char file[] = "zephyr_signed.bin";
 
-    char firmware_filename[MQTT_MAX_STR_LEN];
+    char customer[MQTT_MAX_STR_LEN];
+    char device[MQTT_MAX_STR_LEN];
+    char firmware_filename[MQTT_MAX_STR_LEN * 3]; // plenty of room
 
+    // copy results immediately so we don't lose them
+    const char *cfg_val = get_config("name");
+    if (cfg_val) {
+        strncpy(customer, cfg_val, sizeof(customer));
+        customer[sizeof(customer) - 1] = '\0'; // ensure null-terminated
+    } else {
+        customer[0] = '\0';
+    }
+
+    cfg_val = get_config("mq_clid");
+    if (cfg_val) {
+        strncpy(device, cfg_val, sizeof(device));
+        device[sizeof(device) - 1] = '\0';
+    } else {
+        device[0] = '\0';
+    }
+
+    // build path
     snprintf(firmware_filename, sizeof(firmware_filename),
-                  "%s/%s/%s/%s", root, customer, device, file);
-
+             "%s/%s/%s/%s", root, customer, device, file);
 
     printf("Firmware filename: %s\n", firmware_filename);
 }
