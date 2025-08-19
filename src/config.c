@@ -415,7 +415,7 @@ void set_filename(void) {
 
     // build path
     snprintf(firmware_filename, sizeof(firmware_filename),
-             "%s/%s/%s/%s", root, customer, device, file);
+             "/%s/%s/%s/%s", root, customer, device, file);
 
     printf("Firmware filename: %s\n", firmware_filename);
 }

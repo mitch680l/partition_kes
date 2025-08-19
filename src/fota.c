@@ -15,8 +15,7 @@
 #include <modem/modem_key_mgmt.h>
 #include <net/fota_download.h>
 #include <nrf_socket.h>
-// Configuration defines
-#define CONFIG_DOWNLOAD_HOST "18.234.99.151"
+
 
 
 
@@ -121,6 +120,11 @@ static int modem_configure_and_connect(void)
 	int err;
 
 	printk("LTE Link Connecting ...\n");
+	lte_lc_system_mode_set(LTE_LC_SYSTEM_MODE_LTEM, LTE_LC_SYSTEM_MODE_PREFER_AUTO);
+   
+    lte_lc_psm_req(false);
+    
+    lte_lc_func_mode_set(LTE_LC_FUNC_MODE_NORMAL);
 	err = lte_lc_connect_async(lte_lc_handler);
 	if (err) {
 		printk("LTE link could not be established.");
@@ -178,7 +182,7 @@ static int update_download(void)
 		return 0;
 	}
 
-	err = fota_download_start(CONFIG_DOWNLOAD_HOST, firmware_filename, atoi(ota_config.cert_tag), 0, 0);
+	err = fota_download_start(ota_config.server_addr, firmware_filename, atoi(ota_config.cert_tag), 0, 0);
 	if (err) {
 		printk("fota_download_start() failed, err %d\n", err);
 		return err;
