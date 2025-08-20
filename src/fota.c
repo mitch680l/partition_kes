@@ -184,7 +184,7 @@ static int update_download(void)
 
 	printk("Uploading firmware from %s\n", ota_config.server_addr);
 	printk("Firmware filename: %s\n", firmware_filename);
-	err = fota_download_start(ota_config.server_addr, "/firmware_storage/test_app/nrid001", atoi(ota_config.cert_tag), 0, 0);
+	err = fota_download_start(ota_config.server_addr, firmware_filename, atoi(ota_config.cert_tag), 0, 0);
 	if (err) {
 		printk("fota_download_start() failed, err %d\n", err);
 		return err;

@@ -394,7 +394,6 @@ void set_filename(void) {
 
     char customer[MQTT_MAX_STR_LEN];
     char device[MQTT_MAX_STR_LEN];
-    char firmware_filename[MQTT_MAX_STR_LEN * 3]; // plenty of room
 
     // copy results immediately so we don't lose them
     const char *cfg_val = get_config("name");
@@ -415,7 +414,7 @@ void set_filename(void) {
 
     // build path
     snprintf(firmware_filename, sizeof(firmware_filename),
-             "/%s/%s/%s/%s", root, customer, device, file);
+             "%s/%s/%s/%s", root, customer, device, file);
 
     printf("Firmware filename: %s\n", firmware_filename);
 }
